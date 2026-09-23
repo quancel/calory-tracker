@@ -33,3 +33,10 @@ den JSON-Dateien daneben.
 | 2026-09-23T07:32:52Z | — | _Nutzer-Eingabe_ | — | — | — | `prompts.md` (<agent-message from="a4125b536e4932abe">) |
 | 2026-09-23T07:33:00Z | — | _Nutzer-Eingabe_ | — | — | — | `prompts.md` (<task-notification>) |
 | 2026-09-23T07:33:38Z | — | _Nutzer-Eingabe_ | — | — | — | `prompts.md` (beide umsetzen) |
+| 2026-09-23T07:42:19Z | — | _Nutzer-Eingabe_ | — | — | — | `prompts.md` (wäre gut wenn man noch die ziel kalorien angezeigt bekommt i) |
+| 2026-09-23T07:43:58Z | — | _Nutzer-Eingabe_ | — | — | — | `prompts.md` (was ist die url für die app?) |
+| 2026-09-23T07:45:24Z | — | _Nutzer-Eingabe_ | — | — | — | `prompts.md` (kannst du noch weitere dinge hinzufügen aus der open food fa) |
+| 2026-09-23T07:51:42Z | — | _Nutzer-Eingabe_ | — | — | — | `prompts.md` (kannst du die einträge auf 100 aufstocken?) |
+| 2026-09-23T07:55:25Z | — | _Nutzer-Eingabe_ | — | — | — | `prompts.md` (beim gewichtslog ist das hinzufügen des gewichts nicht ganz ) |
+| 2026-09-23T07:59:54Z | — | _Nutzer-Eingabe_ | — | — | — | `prompts.md` (<task-notification>) |
+| 2026-09-23T08:02:41Z | — | _Nutzer-Eingabe_ | — | — | — | `prompts.md` (committe und push alles) |
