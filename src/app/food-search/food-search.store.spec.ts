@@ -93,6 +93,7 @@ describe('FoodSearchStore', () => {
   let createEntries: ReturnType<typeof vi.fn>;
   let updateEntry: ReturnType<typeof vi.fn>;
   let deleteEntry: ReturnType<typeof vi.fn>;
+  let loadRecentFoodIds: ReturnType<typeof vi.fn>;
   let loadMeals: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
@@ -105,6 +106,7 @@ describe('FoodSearchStore', () => {
     createEntries = vi.fn().mockResolvedValue({ success: true });
     updateEntry = vi.fn().mockResolvedValue({ success: true });
     deleteEntry = vi.fn().mockResolvedValue({ success: true });
+    loadRecentFoodIds = vi.fn().mockResolvedValue([]);
     loadMeals = vi.fn().mockResolvedValue({ success: true, meals: [] });
 
     TestBed.resetTestingModule();
@@ -117,7 +119,14 @@ describe('FoodSearchStore', () => {
         },
         {
           provide: EntriesService,
-          useValue: { loadEntry, createEntry, createEntries, updateEntry, deleteEntry },
+          useValue: {
+            loadEntry,
+            createEntry,
+            createEntries,
+            updateEntry,
+            deleteEntry,
+            loadRecentFoodIds,
+          },
         },
         { provide: CoreMealsService, useValue: { loadMeals } },
       ],
@@ -132,6 +141,7 @@ describe('FoodSearchStore', () => {
       await store.ensureLoaded();
 
       expect(search).toHaveBeenCalledTimes(1);
+      store.setQuery('Apfel');
       expect(store.results()).toHaveLength(1);
       expect(store.loading()).toBe(false);
       expect(store.loadError()).toBeNull();
@@ -161,6 +171,7 @@ describe('FoodSearchStore', () => {
 
       expect(search).toHaveBeenCalledTimes(2);
       expect(store.loadError()).toBeNull();
+      store.setQuery('Apfel');
       expect(store.results()).toHaveLength(1);
     });
   });
@@ -178,6 +189,56 @@ describe('FoodSearchStore', () => {
 
       expect(store.results().map((f) => f.id)).toEqual(['1']);
       expect(search).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('Zuletzt verwendet (max. 10, leere Suche)', () => {
+    it('shows the recently used foods, in order, when the query is empty', async () => {
+      search.mockResolvedValue({
+        success: true,
+        foods: [
+          makeFood({ id: '1', name: 'Apfel' }),
+          makeFood({ id: '2', name: 'Banane' }),
+          makeFood({ id: '3', name: 'Curry' }),
+        ],
+      });
+      loadRecentFoodIds.mockResolvedValue(['3', '1']);
+      const store = TestBed.inject(FoodSearchStore);
+
+      await store.ensureLoaded();
+
+      expect(loadRecentFoodIds).toHaveBeenCalledWith(10);
+      expect(store.isShowingRecent()).toBe(true);
+      expect(store.results().map((f) => f.id)).toEqual(['3', '1']);
+      expect(store.showNoRecentState()).toBe(false);
+    });
+
+    it('shows the no-recent hint when there is no recent-use history yet', async () => {
+      search.mockResolvedValue({ success: true, foods: [makeFood()] });
+      loadRecentFoodIds.mockResolvedValue([]);
+      const store = TestBed.inject(FoodSearchStore);
+
+      await store.ensureLoaded();
+
+      expect(store.isShowingRecent()).toBe(true);
+      expect(store.results()).toHaveLength(0);
+      expect(store.showNoRecentState()).toBe(true);
+    });
+
+    it('switches to full-catalog search results once a query is entered', async () => {
+      search.mockResolvedValue({
+        success: true,
+        foods: [makeFood({ id: '1', name: 'Apfel' }), makeFood({ id: '2', name: 'Banane' })],
+      });
+      loadRecentFoodIds.mockResolvedValue(['1']);
+      const store = TestBed.inject(FoodSearchStore);
+      await store.ensureLoaded();
+
+      store.setQuery('ban');
+
+      expect(store.isShowingRecent()).toBe(false);
+      expect(store.results().map((f) => f.id)).toEqual(['2']);
+      expect(store.showNoRecentState()).toBe(false);
     });
   });
 
@@ -278,6 +339,7 @@ describe('FoodSearchStore', () => {
         barcode: null,
       });
       expect(search).toHaveBeenCalledTimes(1);
+      store.setQuery('Kiwi');
       expect(store.results().some((f) => f.id === 'new-1')).toBe(true);
     });
 
@@ -396,6 +458,7 @@ describe('FoodSearchStore', () => {
         expect.objectContaining({ name: 'Apfel', kcal100g: 55 }),
       );
       expect(search).toHaveBeenCalledTimes(1); // kein Neuladen
+      store.setQuery('Apfel');
       expect(store.results().find((f) => f.id === 'f12')).toEqual(corrected);
     });
 
@@ -433,6 +496,7 @@ describe('FoodSearchStore', () => {
 
       expect(result).toBeNull();
       expect(store.correctErrorMessage()).toBe('Food konnte nicht aktualisiert werden.');
+      store.setQuery('Apfel');
       expect(store.results().find((f) => f.id === 'f14')).toEqual(original);
     });
 
@@ -465,6 +529,7 @@ describe('FoodSearchStore', () => {
       expect(store.mealType()).toBe('lunch');
       expect(store.entryId()).toBeNull();
       expect(store.isEditing()).toBe(false);
+      store.setQuery('Apfel');
       expect(store.results()).toHaveLength(1); // Food-Cache unberührt
     });
   });
@@ -753,6 +818,7 @@ describe('FoodSearchStore', () => {
       expect(store.stepBFood()?.id).toBe('off-1');
       expect(store.amountInput()).toBe('100');
       expect(store.entryOrigin()).toBe('scan');
+      store.setQuery('Müsli');
       expect(store.results().some((f) => f.id === 'off-1')).toBe(true);
     });
 
@@ -765,6 +831,7 @@ describe('FoodSearchStore', () => {
 
       await store.handleScanDetected('123');
 
+      store.setQuery('Apfel');
       expect(store.results().filter((f) => f.id === 'f1')).toHaveLength(1);
     });
 

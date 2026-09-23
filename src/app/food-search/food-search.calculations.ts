@@ -20,6 +20,22 @@ import type { Food } from '../core/foods.service';
 import type { CreateFoodInput } from './models/food.model';
 
 export type { TextFieldValidation };
+
+/**
+ * Bildet eine Liste von `food_id`s (jüngste zuerst) auf die passenden
+ * `Food`-Objekte aus dem Sitzungs-Cache ab — Reihenfolge bleibt erhalten,
+ * bereits gelöschte/unbekannte IDs werden übersprungen statt einen Fehler
+ * auszulösen. Grundlage der „Zuletzt verwendet"-Liste in Step A.
+ */
+export function selectRecentFoods(foods: readonly Food[], recentFoodIds: readonly string[]): Food[] {
+  const byId = new Map(foods.map((food) => [food.id, food]));
+  const result: Food[] = [];
+  for (const id of recentFoodIds) {
+    const food = byId.get(id);
+    if (food !== undefined) result.push(food);
+  }
+  return result;
+}
 export type NumberFieldValidation =
   { valid: true; value: number } | { valid: false; error: string };
 export type OptionalPositiveValidation =

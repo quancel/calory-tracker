@@ -1,4 +1,5 @@
 import {
+  computeKcalFromMacros,
   computeLiveNutrition,
   filterFoodsByQuery,
   findPlausibilityFindings,
@@ -244,7 +245,7 @@ describe('findPlausibilityFindings (ADR-0011 Punkt 3/4)', () => {
     expect(findings.some((finding) => finding.kind === 'kcal-deviation')).toBe(false);
   });
 
-  it('flags an 11% kcal deviation', () => {
+  it('flags an 11% kcal deviation and names the direction (mehr) when the stated value is too high', () => {
     const findings = findPlausibilityFindings({
       kcal100g: 222,
       proteinG100g: 50,
@@ -253,7 +254,26 @@ describe('findPlausibilityFindings (ADR-0011 Punkt 3/4)', () => {
     });
 
     expect(findings).toEqual([
-      expect.objectContaining({ kind: 'kcal-deviation', message: expect.stringContaining('11%') }),
+      expect.objectContaining({
+        kind: 'kcal-deviation',
+        message: expect.stringMatching(/11%.*mehr/),
+      }),
+    ]);
+  });
+
+  it('names the direction (weniger) when the stated value is too low', () => {
+    const findings = findPlausibilityFindings({
+      kcal100g: 178,
+      proteinG100g: 50,
+      carbsG100g: 0,
+      fatG100g: 0,
+    });
+
+    expect(findings).toEqual([
+      expect.objectContaining({
+        kind: 'kcal-deviation',
+        message: expect.stringMatching(/11%.*weniger/),
+      }),
     ]);
   });
 
@@ -312,5 +332,23 @@ describe('plausibilityMarkerStatusText', () => {
   it('names the priorized status only', () => {
     expect(plausibilityMarkerStatusText({ kind: 'implausible' })).toBe('Nährwerte unplausibel');
     expect(plausibilityMarkerStatusText({ kind: 'incomplete' })).toBe('Nährwerte unvollständig');
+  });
+});
+
+describe('computeKcalFromMacros (Eingabehilfe für Anlege-/Korrekturformular)', () => {
+  it('computes the Atwater energy from the three macros', () => {
+    expect(
+      computeKcalFromMacros({ proteinG100g: 10, carbsG100g: 20, fatG100g: 5 }),
+    ).toBeCloseTo(10 * 4 + 20 * 4 + 5 * 9, 5);
+  });
+
+  it('returns null when any of the three macros is missing', () => {
+    expect(computeKcalFromMacros({ proteinG100g: null, carbsG100g: 20, fatG100g: 5 })).toBeNull();
+    expect(computeKcalFromMacros({ proteinG100g: 10, carbsG100g: null, fatG100g: 5 })).toBeNull();
+    expect(computeKcalFromMacros({ proteinG100g: 10, carbsG100g: 20, fatG100g: null })).toBeNull();
+  });
+
+  it('does not depend on kcal100g at all (pure macro→energy conversion)', () => {
+    expect(computeKcalFromMacros({ proteinG100g: 0, carbsG100g: 0, fatG100g: 0 })).toBe(0);
   });
 });

@@ -117,6 +117,30 @@ export function isNutritionIncomplete(nutrition: NutritionMaybeNull): boolean {
   );
 }
 
+/**
+ * Live-Hilfswert für die Formulare (Anlegen/Korrigieren): rechnet aus den
+ * bereits eingegebenen Makros die Energie nach Atwater aus, damit der
+ * Nutzer beim kcal-Feld nicht selbst rechnen muss. `null`, solange
+ * Protein/Kohlenhydrate/Fett nicht alle vorhanden sind — reine Anzeige,
+ * nie persistiert, keine Bewertung (kein Bezug zu KCAL_DEVIATION_THRESHOLD).
+ */
+export function computeKcalFromMacros(
+  nutrition: Pick<NutritionMaybeNull, 'proteinG100g' | 'carbsG100g' | 'fatG100g'>,
+): number | null {
+  if (
+    nutrition.proteinG100g === null ||
+    nutrition.carbsG100g === null ||
+    nutrition.fatG100g === null
+  ) {
+    return null;
+  }
+  return round1(
+    nutrition.proteinG100g * ATWATER_PROTEIN_KCAL_PER_G +
+      nutrition.carbsG100g * ATWATER_CARBS_KCAL_PER_G +
+      nutrition.fatG100g * ATWATER_FAT_KCAL_PER_G,
+  );
+}
+
 export type PlausibilityFindingKind = 'incomplete' | 'macro-sum-exceeded' | 'kcal-deviation';
 
 export interface PlausibilityFinding {
@@ -175,11 +199,12 @@ export function findPlausibilityFindings(nutrition: NutritionMaybeNull): Plausib
     if (computedKcal > 0) {
       const deviation = Math.abs(nutrition.kcal100g - computedKcal) / computedKcal;
       if (deviation > KCAL_DEVIATION_THRESHOLD) {
+        const direction = nutrition.kcal100g > computedKcal ? 'mehr' : 'weniger';
         findings.push({
           kind: 'kcal-deviation',
           message:
             `Angegebene Energie ${round1(nutrition.kcal100g)} kcal weicht ` +
-            `${Math.round(deviation * 100)}% von berechneten ${round1(computedKcal)} kcal ab.`,
+            `${Math.round(deviation * 100)}% (${direction}) von berechneten ${round1(computedKcal)} kcal ab.`,
         });
       }
     }

@@ -89,7 +89,12 @@
             „{{ store.query().trim() }}" anlegen
           </button>
         </div>
+      } @else if (store.showNoRecentState()) {
+        <p class="list-heading">Suche nach einem Lebensmittel</p>
       } @else {
+        @if (store.isShowingRecent()) {
+          <p class="list-heading">Zuletzt verwendet</p>
+        }
         <ul class="result-list">
           @for (food of store.results(); track food.id) {
             <li class="result-item">
@@ -234,6 +239,11 @@
         />
         @if (createFieldError('kcal100g'); as message) {
           <p class="field-error">{{ message }}</p>
+        }
+        @if (store.createComputedKcal(); as computedKcal) {
+          <p class="computed-kcal-hint tnum">
+            Berechnet aus Protein/Kohlenhydrate/Fett: {{ computedKcal | number: '1.0-1' }} kcal
+          </p>
         }
       </div>
 
@@ -405,6 +415,11 @@
         />
         @if (correctFieldError('kcal100g'); as message) {
           <p class="field-error">{{ message }}</p>
+        }
+        @if (store.correctComputedKcal(); as computedKcal) {
+          <p class="computed-kcal-hint tnum">
+            Berechnet aus Protein/Kohlenhydrate/Fett: {{ computedKcal | number: '1.0-1' }} kcal
+          </p>
         }
       </div>
 

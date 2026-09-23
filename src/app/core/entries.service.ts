@@ -165,6 +165,37 @@ export class EntriesService {
     });
   }
 
+  /**
+   * Zuletzt verwendete `food_id`s über alle Mahlzeiten hinweg, jüngste
+   * zuerst, ohne Duplikate — Grundlage für die „Zuletzt verwendet"-Liste in
+   * Step A (statt der vollständigen Trefferliste bei leerer Suche, die mit
+   * wachsendem Katalog unhandlich würde). RLS beschränkt die Abfrage
+   * serverseitig auf die eigenen Einträge (kein Client-Filter). Übersteuert
+   * dabei niemals `error`: eine fehlgeschlagene Abfrage liefert einfach eine
+   * leere Liste, die Suche bleibt trotzdem benutzbar.
+   */
+  async loadRecentFoodIds(limit: number): Promise<string[]> {
+    const response = await this.supabase.client
+      .from('entries')
+      .select('food_id, created_at')
+      .order('created_at', { ascending: false })
+      .limit(200);
+
+    if (response.error || !response.data) {
+      return [];
+    }
+
+    const seen = new Set<string>();
+    const ids: string[] = [];
+    for (const row of response.data as { food_id: string }[]) {
+      if (seen.has(row.food_id)) continue;
+      seen.add(row.food_id);
+      ids.push(row.food_id);
+      if (ids.length >= limit) break;
+    }
+    return ids;
+  }
+
   async loadEntry(entryId: string): Promise<LoadEntryResult> {
     const pending = this.entryQueue.getById(entryId);
     if (pending) {

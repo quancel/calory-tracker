@@ -74,13 +74,24 @@
 }
 
 .barcode-info,
-.source-hint {
+.source-hint,
+.computed-kcal-hint,
+.list-heading {
   color: var(--color-text-muted);
   font-size: var(--font-size-xs);
 }
 
+.list-heading {
+  margin: var(--space-2) 0 0;
+  padding: 0 var(--space-1);
+}
+
 .barcode-info {
   margin: calc(var(--space-1) * -1) 0 0;
+}
+
+.computed-kcal-hint {
+  margin: var(--space-1) 0 0;
 }
 
 .source-hint {

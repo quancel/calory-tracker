@@ -1,6 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { EntriesService } from '../core/entries.service';
 import {
+  computeKcalFromMacros,
   computeLiveNutrition,
   filterFoodsByQuery,
   findPlausibilityFindings,
@@ -17,9 +18,13 @@ import {
   cameraErrorMessage,
   foodToCorrectFormValues,
   nutritionDraftFromFormValues,
+  selectRecentFoods,
   validateCreateFoodForm,
 } from './food-search.calculations';
 import { FoodSearchService } from './food-search.service';
+
+/** Obergrenze der „Zuletzt verwendet"-Liste bei leerer Suche (statt des vollständigen Katalogs). */
+const RECENT_FOODS_LIMIT = 10;
 
 function emptyCreateForm(): CreateFoodFormValues {
   return {
@@ -120,6 +125,8 @@ export class FoodSearchStore {
   private readonly coreMealsService = inject(CoreMealsService);
 
   private readonly queryState = signal('');
+  /** „Zuletzt verwendet"-IDs (jüngste zuerst), einmal je Sheet-Öffnen geladen (`ensureLoaded()`) — leer, solange noch nichts geloggt wurde oder das Laden fehlschlägt (dann bleibt die Suche trotzdem benutzbar). */
+  private readonly recentFoodIdsState = signal<string[]>([]);
 
   private readonly createFormState = signal<CreateFoodFormValues>(emptyCreateForm());
   private readonly createSavingState = signal(false);
@@ -170,8 +177,23 @@ export class FoodSearchStore {
   readonly createSaving = this.createSavingState.asReadonly();
   readonly createErrorMessage = this.createErrorState.asReadonly();
 
-  readonly results = computed(() =>
-    filterFoodsByQuery(this.coreFoodsService.foods(), this.queryState()),
+  /** `true` bei leerer Suche: dann zeigt `results` die „Zuletzt verwendet"-Liste statt des vollständigen Katalogs (der mit wachsendem Bestand unhandlich würde) — der Rest bleibt über die Suche erreichbar. */
+  readonly isShowingRecent = computed(() => this.queryState().trim() === '');
+
+  readonly results = computed(() => {
+    if (this.isShowingRecent()) {
+      return selectRecentFoods(this.coreFoodsService.foods(), this.recentFoodIdsState());
+    }
+    return filterFoodsByQuery(this.coreFoodsService.foods(), this.queryState());
+  });
+
+  /** `true` nur bei leerer Suche UND leerer „Zuletzt verwendet"-Liste (z.B. noch nie etwas geloggt) — eigener, nicht-alarmierender Hinweis statt eines leeren Listenbereichs. */
+  readonly showNoRecentState = computed(
+    () =>
+      this.coreFoodsService.loaded() &&
+      !this.coreFoodsService.loading() &&
+      this.isShowingRecent() &&
+      this.results().length === 0,
   );
 
   /** Leerzustand (design-conventions.md „Step A"): nur bei einer nicht-leeren Suche ohne Treffer, nie beim ersten Öffnen ohne Eingabe. */
@@ -179,13 +201,17 @@ export class FoodSearchStore {
     () =>
       this.coreFoodsService.loaded() &&
       !this.coreFoodsService.loading() &&
-      this.queryState().trim() !== '' &&
+      !this.isShowingRecent() &&
       this.results().length === 0,
   );
 
   readonly createValidation = computed(() => validateCreateFoodForm(this.createFormState()));
   readonly canCreate = computed(
     () => this.createValidation().value !== null && !this.createSavingState(),
+  );
+  /** Live-Hilfswert fürs kcal-Feld: aus den bereits eingegebenen Makros berechnete Energie, `null` solange nicht alle drei vorhanden sind — reine Eingabehilfe, keine Bewertung. */
+  readonly createComputedKcal = computed(() =>
+    computeKcalFromMacros(nutritionDraftFromFormValues(this.createFormState())),
   );
 
   readonly correctForm = this.correctFormState.asReadonly();
@@ -198,6 +224,10 @@ export class FoodSearchStore {
   /** Alle Befunde für das Banner der Korrekturansicht (design-conventions.md „Anzeige in der Detailansicht") — reine, live aus den aktuellen Formularwerten abgeleitete Darstellung, nirgends persistiert (ADR-0011 Punkt 5). */
   readonly correctFindings = computed(() =>
     findPlausibilityFindings(nutritionDraftFromFormValues(this.correctFormState())),
+  );
+  /** Live-Hilfswert fürs kcal-Feld, analog createComputedKcal. */
+  readonly correctComputedKcal = computed(() =>
+    computeKcalFromMacros(nutritionDraftFromFormValues(this.correctFormState())),
   );
 
   readonly stepBFood = this.stepBFoodState.asReadonly();
@@ -259,9 +289,25 @@ export class FoodSearchStore {
     })),
   );
 
-  /** Lädt den Food-Bestand genau einmal je Sitzung — delegiert an den zentralen Food-Cache (ADR-0012 Punkt 1, ehemals ADR-0008 Punkt 3). Erneuter Aufruf ohne `retryLoad()` ist ein No-op. */
+  /**
+   * Lädt den Food-Bestand genau einmal je Sitzung — delegiert an den
+   * zentralen Food-Cache (ADR-0012 Punkt 1, ehemals ADR-0008 Punkt 3).
+   * Erneuter Aufruf ohne `retryLoad()` ist ein No-op für den Katalog.
+   *
+   * Die „Zuletzt verwendet"-Liste wird dagegen bei JEDEM Sheet-Öffnen neu
+   * geladen (kein Sitzungs-Cache) — sie soll auch widerspiegeln, was seit
+   * dem letzten Öffnen geloggt wurde.
+   */
   async ensureLoaded(): Promise<void> {
-    await this.coreFoodsService.ensureLoaded();
+    await Promise.all([
+      this.coreFoodsService.ensureLoaded(),
+      this.loadRecentFoodIds(),
+    ]);
+  }
+
+  private async loadRecentFoodIds(): Promise<void> {
+    const ids = await this.entriesService.loadRecentFoodIds(RECENT_FOODS_LIMIT);
+    this.recentFoodIdsState.set(ids);
   }
 
   /** Erneuter Ladeversuch nach einem Fehler (Retry-Button im Fehlerzustand). */

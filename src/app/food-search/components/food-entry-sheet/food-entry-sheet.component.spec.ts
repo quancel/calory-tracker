@@ -50,18 +50,22 @@ describe('FoodEntrySheetComponent', () => {
     loadError: ReturnType<typeof signal>;
     query: ReturnType<typeof signal>;
     results: ReturnType<typeof signal>;
+    isShowingRecent: ReturnType<typeof signal>;
+    showNoRecentState: ReturnType<typeof signal>;
     showEmptyState: ReturnType<typeof signal>;
     createForm: ReturnType<typeof signal>;
     createSaving: ReturnType<typeof signal>;
     createErrorMessage: ReturnType<typeof signal>;
     createValidation: ReturnType<typeof signal>;
     canCreate: ReturnType<typeof signal>;
+    createComputedKcal: ReturnType<typeof signal>;
     correctForm: ReturnType<typeof signal>;
     correctSaving: ReturnType<typeof signal>;
     correctErrorMessage: ReturnType<typeof signal>;
     correctValidation: ReturnType<typeof signal>;
     canSubmitCorrect: ReturnType<typeof signal>;
     correctFindings: ReturnType<typeof signal>;
+    correctComputedKcal: ReturnType<typeof signal>;
     mealType: ReturnType<typeof signal>;
     stepBFood: ReturnType<typeof signal<StepBFood | null>>;
     amountInput: ReturnType<typeof signal>;
@@ -122,6 +126,8 @@ describe('FoodEntrySheetComponent', () => {
       loadError: signal<string | null>(null),
       query: signal(''),
       results: signal<Food[]>([]),
+      isShowingRecent: signal(true),
+      showNoRecentState: signal(false),
       showEmptyState: signal(false),
       createForm: signal({
         name: '',
@@ -136,6 +142,7 @@ describe('FoodEntrySheetComponent', () => {
       createErrorMessage: signal<string | null>(null),
       createValidation: signal(neutralValidation()),
       canCreate: signal(false),
+      createComputedKcal: signal<number | null>(null),
       correctForm: signal({
         name: '',
         kcal100g: '',
@@ -150,6 +157,7 @@ describe('FoodEntrySheetComponent', () => {
       correctValidation: signal(neutralValidation()),
       canSubmitCorrect: signal(false),
       correctFindings: signal<{ kind: string; message: string }[]>([]),
+      correctComputedKcal: signal<number | null>(null),
       mealType: signal<'breakfast' | 'lunch' | 'dinner' | 'snack'>('breakfast'),
       stepBFood: signal<StepBFood | null>(null),
       amountInput: signal(''),
