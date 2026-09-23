@@ -10,12 +10,7 @@
 } @else if (!store.hasEntries()) {
   <div class="state-empty">
     <p class="empty-text">Noch keine Gewichtseinträge</p>
-    <button
-      type="button"
-      class="entry-button"
-      (click)="store.openSheet()"
-      aria-label="Gewicht erfassen"
-    >
+    <button type="button" class="entry-button" (click)="store.openSheet()">
       <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
         <path
           d="M12 5v14M5 12h14"
@@ -25,16 +20,12 @@
           stroke-linecap="round"
         />
       </svg>
+      <span>Gewicht erfassen</span>
     </button>
   </div>
 } @else {
   <div class="entry-row">
-    <button
-      type="button"
-      class="entry-button"
-      (click)="store.openSheet()"
-      aria-label="Gewicht erfassen"
-    >
+    <button type="button" class="entry-button" (click)="store.openSheet()">
       <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
         <path
           d="M12 5v14M5 12h14"
@@ -44,6 +35,7 @@
           stroke-linecap="round"
         />
       </svg>
+      <span>Gewicht erfassen</span>
     </button>
   </div>
 
