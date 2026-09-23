@@ -22,3 +22,21 @@ es sollte eine schnelle möglichkeit geben von der hauptpage heraus sein gewicht
 ```
 sieht gut aus, commit und push
 ```
+
+## 2026-09-23T09:29:53Z
+
+```
+ja
+```
+
+## 2026-09-23T09:35:15Z
+
+```
+leg eine .nvmrc mit 22.23.1 an
+```
+
+## 2026-09-23T09:35:57Z
+
+```
+ja committe und pushe alles. ist das deployment fertig?
+```
