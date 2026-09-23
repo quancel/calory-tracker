@@ -50,7 +50,7 @@
       actualRounded()
     }}</span>
     @if (progress().hasGoal) {
-      <span class="kcal-unit">kcal</span>
+      <span class="kcal-unit">von {{ progress().goal }} kcal</span>
       @if (progress().isWarning) {
         <span class="overshoot-text">+{{ overshootRounded() }} kcal über Ziel</span>
       }

@@ -167,8 +167,10 @@ Tagesansicht):
 ## Kalorienring
 
 - SVG-Ring, Strichstärke `--space-2` (8px), Restfläche `--color-border`;
-  zentrale Zahl `--font-size-4xl`/`--font-weight-semibold`/`.tnum`,
-  Einheit `kcal` darunter in `--font-size-sm`/`--color-text-muted`.
+  zentrale Zahl `--font-size-4xl`/`--font-weight-semibold`/`.tnum`, darunter
+  bei gesetztem Ziel „von &lt;Ziel&gt; kcal" in
+  `--font-size-sm`/`--color-text-muted` (Nachpflege 2026-09-23 — vorher nur
+  die bloße Einheit „kcal" ohne Zielwert, auf Nutzerwunsch ergänzt).
 - Wertwechsel animiert über `stroke-dashoffset`, max. `--duration-ring`
   (400ms), `--ease-out`.
 - **Kein Ziel gesetzt:** ist für kcal kein Ziel hinterlegt, bleibt der Ring
