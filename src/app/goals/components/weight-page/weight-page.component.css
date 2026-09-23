@@ -1,51 +1,25 @@
-.goals-page {
+.weight-page {
   max-width: 640px;
   margin: 0 auto;
   padding: var(--space-6) var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: var(--space-8);
+  gap: var(--space-6);
 }
 
-.goals-header {
+.weight-header {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  min-height: var(--size-touch-target-min);
 }
 
-.back-link {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--size-touch-target-min);
-  height: var(--size-touch-target-min);
-  border-radius: var(--radius-sm);
-  color: var(--color-text);
-}
-
-.back-link:focus-visible {
-  outline: var(--focus-ring-width) solid var(--color-focus-ring);
-  outline-offset: var(--focus-ring-offset);
-}
-
-.goals-title {
+.weight-title {
   flex: 1;
   text-align: center;
   margin: 0;
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text);
-}
-
-.header-spacer {
-  width: var(--size-touch-target-min);
-  height: var(--size-touch-target-min);
-}
-
-.goal-fields {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
 }
 
 .state-loading {
@@ -61,6 +35,10 @@
 
 .skeleton-field {
   height: var(--size-touch-target-min);
+}
+
+.skeleton-chart {
+  height: 200px;
 }
 
 .state-error {

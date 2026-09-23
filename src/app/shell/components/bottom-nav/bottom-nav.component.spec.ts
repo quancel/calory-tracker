@@ -9,6 +9,7 @@ describe('BottomNavComponent', () => {
       providers: [
         provideRouter([
           { path: 'tagebuch', component: BottomNavComponent },
+          { path: 'gewicht', component: BottomNavComponent },
           { path: 'verlauf', component: BottomNavComponent },
           { path: 'ziele', component: BottomNavComponent },
           { path: 'mahlzeiten', component: BottomNavComponent },
@@ -23,15 +24,26 @@ describe('BottomNavComponent', () => {
     return fixture;
   }
 
-  it('renders a landmark nav with exactly two tabs, Tagebuch and Verlauf', () => {
+  it('renders a landmark nav with exactly three tabs, Tagebuch, Gewicht and Verlauf', () => {
     const fixture = setup();
     const nav = fixture.nativeElement.querySelector('nav[aria-label="Hauptnavigation"]');
     expect(nav).not.toBeNull();
 
     const tabs = fixture.nativeElement.querySelectorAll('.nav-tab');
-    expect(tabs).toHaveLength(2);
+    expect(tabs).toHaveLength(3);
     expect(tabs[0].textContent).toContain('Tagebuch');
-    expect(tabs[1].textContent).toContain('Verlauf');
+    expect(tabs[1].textContent).toContain('Gewicht');
+    expect(tabs[2].textContent).toContain('Verlauf');
+  });
+
+  it('marks the Gewicht tab active with aria-current when on /gewicht', async () => {
+    const fixture = setup();
+    await TestBed.inject(Router).navigateByUrl('/gewicht');
+    fixture.detectChanges();
+
+    const gewichtTab = fixture.nativeElement.querySelector('a[routerLink="/gewicht"]');
+    expect(gewichtTab.classList.contains('active')).toBe(true);
+    expect(gewichtTab.getAttribute('aria-current')).toBe('page');
   });
 
   it('marks the Tagebuch tab active with aria-current when on /tagebuch', async () => {

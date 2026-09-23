@@ -9,9 +9,9 @@ import {
   computeWeightTrendSlope,
   filterWeightChartWindow,
   hasSufficientData,
-  validateWeightEntry,
 } from './weight.calculations';
-import type { IntakeDay, WeightLogEntry } from './models/weight.model';
+import type { WeightLogEntry } from '../core/weight-logs.service';
+import type { IntakeDay } from './models/weight.model';
 
 function log(dateKey: string, weightKg: number): WeightLogEntry {
   return { id: dateKey, dateKey, weightKg };
@@ -20,38 +20,6 @@ function log(dateKey: string, weightKg: number): WeightLogEntry {
 function intake(dateKey: string, kcal: number): IntakeDay {
   return { dateKey, kcal };
 }
-
-describe('validateWeightEntry', () => {
-  it('rejects an empty value', () => {
-    expect(validateWeightEntry('')).toEqual({ valid: false, error: 'Bitte ein Gewicht eingeben.' });
-  });
-
-  it('rejects a non-numeric value', () => {
-    expect(validateWeightEntry('abc').valid).toBe(false);
-  });
-
-  it('rejects more than one decimal place', () => {
-    const result = validateWeightEntry('72.45');
-    expect(result).toEqual({ valid: false, error: 'Bitte höchstens eine Nachkommastelle eingeben.' });
-  });
-
-  it('accepts a German comma decimal', () => {
-    expect(validateWeightEntry('72,4')).toEqual({ valid: true, value: 72.4 });
-  });
-
-  it('rejects a value below 20 kg', () => {
-    expect(validateWeightEntry('19.9').valid).toBe(false);
-  });
-
-  it('rejects a value above 400 kg', () => {
-    expect(validateWeightEntry('400.1').valid).toBe(false);
-  });
-
-  it('accepts the boundary values', () => {
-    expect(validateWeightEntry('20').valid).toBe(true);
-    expect(validateWeightEntry('400').valid).toBe(true);
-  });
-});
 
 describe('computeWeightTrendSlope', () => {
   it('returns 0 for fewer than two points', () => {

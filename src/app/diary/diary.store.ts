@@ -4,9 +4,14 @@ import { EntriesService } from '../core/entries.service';
 import { EntryQueueService } from '../core/entry-queue.service';
 import { MEAL_TYPE_ORDER, type MealType } from '../core/meal-type.constants';
 import { computeProgress } from '../core/progress.calculations';
+import { type WeightEntryValidation, validateWeightEntry } from '../core/weight.calculations';
+import { type WeightLogEntry, WeightLogsService } from '../core/weight-logs.service';
 import {
+  WEIGHT_CARD_WINDOW_DAYS,
   computeDayTotals,
   computeMealSections,
+  computeWeightTrendSummary,
+  formatWeightDelta,
   suggestedMealTypeForHour,
 } from './diary.calculations';
 import { DiaryService } from './diary.service';
@@ -30,6 +35,7 @@ export class DiaryStore {
   private readonly diaryService = inject(DiaryService);
   private readonly entriesService = inject(EntriesService);
   private readonly entryQueue = inject(EntryQueueService);
+  private readonly weightLogsService = inject(WeightLogsService);
 
   private readonly dateState = signal<string>(todayKey());
   private readonly entriesState = signal<DiaryEntry[]>([]);
@@ -55,6 +61,15 @@ export class DiaryStore {
    * bewusst nicht an (ADR-0013 Punkt 5).
    */
   private readonly undoState = signal<ReadonlyMap<CopyContext, CopyUndoState>>(new Map());
+
+  // --- Gewichtskarte (ADR-0019) ---------------------------------------------
+  private readonly weightLogsState = signal<WeightLogEntry[]>([]);
+  private readonly weightLoadErrorState = signal<string | null>(null);
+  private readonly weightInputState = signal('');
+  /** `true`, nachdem „Ändern" an einem bereits erfassten Tagesgewicht getippt wurde. */
+  private readonly weightEditingState = signal(false);
+  private readonly weightSavingState = signal(false);
+  private readonly weightSubmitErrorState = signal<string | null>(null);
 
   readonly currentDate = this.dateState.asReadonly();
   readonly loading = this.loadingState.asReadonly();
@@ -142,6 +157,52 @@ export class DiaryStore {
     computeProgress(this.totals().fatG, this.goalState()?.fatG),
   );
 
+  readonly weightLoadError = this.weightLoadErrorState.asReadonly();
+  readonly weightInput = this.weightInputState.asReadonly();
+  readonly weightEditing = this.weightEditingState.asReadonly();
+  readonly weightSaving = this.weightSavingState.asReadonly();
+  readonly weightSubmitError = this.weightSubmitErrorState.asReadonly();
+
+  /** Mini-Verlauf der letzten `WEIGHT_CARD_WINDOW_DAYS` Tage bis heute — unabhängig vom angezeigten Tag. */
+  readonly weightTrend = computed(() =>
+    computeWeightTrendSummary(this.weightLogsState(), todayKey()),
+  );
+  readonly weightDeltaText = computed(() => formatWeightDelta(this.weightTrend()));
+
+  /** Bereits erfasstes Gewicht des **angezeigten** Tages, `null` ohne Messung. */
+  readonly dayWeight = computed(
+    () => this.weightLogsState().find((log) => log.dateKey === this.dateState()) ?? null,
+  );
+
+  /** Gewicht lässt sich für heute und vergangene Tage erfassen, nicht für die Zukunft. */
+  readonly canLogWeight = computed(() => this.dateState() <= todayKey());
+
+  /** Tagesbezug im Feldlabel: „heute", „gestern" oder Wochentag + Datum. */
+  readonly weightDayLabel = computed(() => {
+    const label = this.dateLabel();
+    if (label.kind === 'today') return 'heute';
+    if (label.kind === 'yesterday') return 'gestern';
+    return label.text;
+  });
+
+  readonly weightValidation = computed<WeightEntryValidation>(() =>
+    validateWeightEntry(this.weightInputState()),
+  );
+  readonly canSubmitWeight = computed(
+    () => this.weightValidation().valid && !this.weightSavingState(),
+  );
+
+  /**
+   * Frühester zu ladender Tag: das Mini-Verlauf-Fenster, erweitert bis zum
+   * angezeigten Tag, falls dieser weiter zurückliegt — sonst wäre ein
+   * bereits erfasster Wert dort unsichtbar und würde still überschrieben.
+   */
+  private readonly weightRangeStart = computed(() => {
+    const windowStart = addDaysToKey(todayKey(), -(WEIGHT_CARD_WINDOW_DAYS - 1));
+    const current = this.dateState();
+    return current < windowStart ? current : windowStart;
+  });
+
   constructor() {
     // Initialer Ladevorgang UND jede spätere Aktualisierung laufen über
     // denselben Pfad: `entriesService.revision` wird beim ersten `effect`-
@@ -154,11 +215,22 @@ export class DiaryStore {
       this.entriesService.revision();
       void this.loadCurrentDay();
     });
+
+    // Gewichtsmessungen: neu laden nach jedem Schreibvorgang auf
+    // `weight_logs` (auch aus der Gewicht-Ansicht) und wenn der angezeigte
+    // Tag vor das geladene Fenster rutscht (`weightRangeStart` ändert sich
+    // nur dann, `computed` dedupliziert gleiche Werte).
+    effect(() => {
+      this.weightLogsService.revision();
+      const startKey = this.weightRangeStart();
+      void this.loadWeightLogs(startKey);
+    });
   }
 
   async goToPreviousDay(): Promise<void> {
     this.dateState.set(addDaysToKey(this.dateState(), -1));
     this.clearAllFeedback();
+    this.resetWeightEntry();
     await this.loadCurrentDay();
   }
 
@@ -166,6 +238,7 @@ export class DiaryStore {
     if (!this.canGoForward()) return;
     this.dateState.set(addDaysToKey(this.dateState(), 1));
     this.clearAllFeedback();
+    this.resetWeightEntry();
     await this.loadCurrentDay();
   }
 
@@ -267,6 +340,75 @@ export class DiaryStore {
    */
   clearAllFeedback(): void {
     this.undoState.set(new Map());
+  }
+
+  setWeightInput(value: string): void {
+    this.weightInputState.set(value);
+    this.weightSubmitErrorState.set(null);
+  }
+
+  /** „Ändern" am bereits erfassten Tagesgewicht: Feld mit dem gespeicherten Wert vorbelegen. */
+  startWeightEdit(): void {
+    const existing = this.dayWeight();
+    this.weightInputState.set(existing ? `${existing.weightKg}`.replace('.', ',') : '');
+    this.weightSubmitErrorState.set(null);
+    this.weightEditingState.set(true);
+  }
+
+  cancelWeightEdit(): void {
+    this.resetWeightEntry();
+  }
+
+  /**
+   * Speichert das Gewicht für den **angezeigten** Tag. Ersetzen eines
+   * bestehenden Werts läuft nur über den ausdrücklichen „Ändern"-Schritt —
+   * dieser ersetzt den Bestätigungsdialog des Erfassen-Sheets (ADR-0019).
+   * Nach Erfolg lädt der `revision`-Effect die Messungen neu.
+   */
+  async saveWeight(): Promise<void> {
+    const validation = this.weightValidation();
+    if (!validation.valid || this.weightSavingState()) return;
+
+    this.weightSavingState.set(true);
+    this.weightSubmitErrorState.set(null);
+
+    const result = await this.weightLogsService.upsertWeightLog(this.dateState(), validation.value);
+
+    this.weightSavingState.set(false);
+    if (!result.success) {
+      this.weightSubmitErrorState.set(result.message);
+      return;
+    }
+
+    this.resetWeightEntry();
+  }
+
+  private resetWeightEntry(): void {
+    this.weightInputState.set('');
+    this.weightEditingState.set(false);
+    this.weightSubmitErrorState.set(null);
+  }
+
+  /** Erneuter Ladeversuch der Gewichtskarte (eigener Fehlerzustand). */
+  async retryWeight(): Promise<void> {
+    await this.loadWeightLogs(this.weightRangeStart());
+  }
+
+  /**
+   * Fehlschlag ist für die Tagesansicht nicht kritisch — die Karte zeigt
+   * einen eigenen Hinweis mit „Erneut versuchen", der Tages-Fehlerzustand
+   * bleibt unberührt. Die Schnelleingabe ist in diesem Zustand
+   * ausgeblendet: ohne geladene Messungen ist nicht bekannt, ob für den Tag
+   * schon ein Wert existiert, der sonst still ersetzt würde.
+   */
+  private async loadWeightLogs(startKey: string): Promise<void> {
+    const result = await this.weightLogsService.loadWeightLogs(startKey, todayKey());
+    if (!result.success) {
+      this.weightLoadErrorState.set(result.message);
+      return;
+    }
+    this.weightLoadErrorState.set(null);
+    this.weightLogsState.set(result.logs);
   }
 
   private async performCopy(

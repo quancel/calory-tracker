@@ -17,6 +17,7 @@ import { CalorieRingComponent } from '../calorie-ring/calorie-ring.component';
 import { CopyFeedbackComponent } from '../copy-feedback/copy-feedback.component';
 import { DateNavComponent } from '../date-nav/date-nav.component';
 import { MealSectionComponent } from '../meal-section/meal-section.component';
+import { WeightCardComponent } from '../weight-card/weight-card.component';
 
 /**
  * Tagebuch-Shell — Tagesansicht (Paket PO-2026-09-20-004, siehe ADR-0006).
@@ -47,6 +48,7 @@ import { MealSectionComponent } from '../meal-section/meal-section.component';
     MealSectionComponent,
     CopyFeedbackComponent,
     ConfirmDialogComponent,
+    WeightCardComponent,
   ],
   templateUrl: './diary-shell.component.html',
   styleUrl: './diary-shell.component.css',

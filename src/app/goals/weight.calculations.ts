@@ -66,7 +66,8 @@
  */
 
 import { addDaysToKey, diffInDays } from '../core/date.calculations';
-import type { CalorieSuggestionResult, IntakeDay, WeightLogEntry } from './models/weight.model';
+import type { WeightLogEntry } from '../core/weight-logs.service';
+import type { CalorieSuggestionResult, IntakeDay } from './models/weight.model';
 
 // --- Fenster ---------------------------------------------------------------
 
@@ -95,63 +96,6 @@ export const MAX_WEEKLY_GAIN_KG = 0.25;
 /** Plausibilitätsgrenze des Vorschlags (ADR-0017 Punkt 3 Konsequenzen, ADR-0018 Schritt 4). */
 export const SUGGESTION_MIN_KCAL = 1200;
 export const SUGGESTION_MAX_KCAL = 6000;
-
-// --- Wertebereich der Gewichtseingabe (ADR-0017 Punkt 2, ADR-0018 Punkt 2) --
-
-/** Bewusste Doppelung zum `check`-Constraint von `weight_logs`/`goals.target_weight_kg` — beide bei Änderung nachziehen. */
-export const WEIGHT_MIN_KG = 20;
-export const WEIGHT_MAX_KG = 400;
-export const WEIGHT_MAX_DECIMAL_PLACES = 1;
-
-// --- Eingabevalidierung des Erfassen-Sheets ---------------------------------
-
-export type WeightEntryValidation =
-  | { valid: true; value: number }
-  | { valid: false; error: string };
-
-function normalizeWeightNumber(raw: string): string | null {
-  const normalized = raw.trim().replace(',', '.');
-  if (normalized === '' || !/^-?\d+(\.\d+)?$/.test(normalized)) {
-    return null;
-  }
-  return normalized;
-}
-
-function countDecimalPlaces(normalized: string): number {
-  const dotIndex = normalized.indexOf('.');
-  return dotIndex === -1 ? 0 : normalized.length - dotIndex - 1;
-}
-
-/**
- * Validiert die Rohtext-Eingabe des Erfassen-Sheets (design-conventions.md
- * „Erfassen-Sheet"): Pflichtfeld, Wertebereich `WEIGHT_MIN_KG`–`WEIGHT_MAX_KG`,
- * höchstens eine Nachkommastelle.
- */
-export function validateWeightEntry(raw: string): WeightEntryValidation {
-  const trimmed = raw.trim();
-  if (trimmed === '') {
-    return { valid: false, error: 'Bitte ein Gewicht eingeben.' };
-  }
-
-  const normalized = normalizeWeightNumber(trimmed);
-  if (normalized === null) {
-    return { valid: false, error: 'Bitte eine gültige Zahl eingeben.' };
-  }
-
-  if (countDecimalPlaces(normalized) > WEIGHT_MAX_DECIMAL_PLACES) {
-    return { valid: false, error: 'Bitte höchstens eine Nachkommastelle eingeben.' };
-  }
-
-  const value = Number(normalized);
-  if (value < WEIGHT_MIN_KG || value > WEIGHT_MAX_KG) {
-    return {
-      valid: false,
-      error: `Gewicht muss zwischen ${WEIGHT_MIN_KG} und ${WEIGHT_MAX_KG} kg liegen.`,
-    };
-  }
-
-  return { valid: true, value };
-}
 
 // --- Trend (lineare Regression) ---------------------------------------------
 
@@ -256,8 +200,12 @@ export interface DataSufficiencyInput {
 
 /** Prüft die vier Mindestdatenlage-Bedingungen aus ADR-0017 Punkt 3 einzeln, verknüpft mit UND. */
 export function hasSufficientData(input: DataSufficiencyInput): boolean {
-  const { measurementsInWindow, latestMeasurementDateKey, intakeDaysInWindowCount, referenceDateKey } =
-    input;
+  const {
+    measurementsInWindow,
+    latestMeasurementDateKey,
+    intakeDaysInWindowCount,
+    referenceDateKey,
+  } = input;
 
   if (measurementsInWindow.length < MIN_MEASUREMENTS) return false;
 
@@ -354,9 +302,7 @@ export function filterWeightChartWindow(
 }
 
 /** Verbindungssegmente zwischen aufeinanderfolgenden Diagrammpunkten, je mit Lücken-Markierung. */
-export function buildWeightChartSegments(
-  points: readonly WeightLogEntry[],
-): WeightChartSegment[] {
+export function buildWeightChartSegments(points: readonly WeightLogEntry[]): WeightChartSegment[] {
   const segments: WeightChartSegment[] = [];
   for (let i = 0; i < points.length - 1; i++) {
     const hasGap = diffInDays(points[i].dateKey, points[i + 1].dateKey) > 1;

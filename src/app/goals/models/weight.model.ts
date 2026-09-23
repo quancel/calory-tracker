@@ -3,16 +3,9 @@
  * ADR-0018). Reine Typen, kein Angular-Import. Eigenständig von
  * `goal.model.ts` (`GoalValues` trägt nur `targetWeightKg`, keine Messreihe)
  * — Messungen und Ziel bleiben unterschiedliche Fachlichkeiten, auch wenn
- * beide in `goals` gelesen/geschrieben werden.
+ * beide in `goals` gelesen/geschrieben werden. Der Messwert-Typ selbst
+ * (`WeightLogEntry`) liegt seit ADR-0019 in `core/weight-logs.service.ts`.
  */
-
-/** Eine einzelne Gewichtsmessung aus `weight_logs`. */
-export interface WeightLogEntry {
-  readonly id: string;
-  /** Lokaler Kalendertag `YYYY-MM-DD` (ADR-0006 Punkt 2). */
-  readonly dateKey: string;
-  readonly weightKg: number;
-}
 
 /** Tages-kcal-Summe für die Ist-Zufuhr des Vorschlags (ADR-0017 Punkt 4). */
 export interface IntakeDay {

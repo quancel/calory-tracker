@@ -2,7 +2,6 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { GoalsStore } from '../../goals.store';
-import { WeightStore } from '../../weight.store';
 import { GoalsPageComponent } from './goals-page.component';
 
 describe('GoalsPageComponent', () => {
@@ -21,24 +20,6 @@ describe('GoalsPageComponent', () => {
     savedValue: ReturnType<typeof vi.fn>;
   };
 
-  // Stub, damit das verschachtelte `app-weight-log-section` (rendert bei
-  // jedem `GoalsPageComponent`-Test mit) nicht den echten `WeightStore` und
-  // damit Supabase/`fetch` anstößt — dieselbe Isolation wie beim
-  // `GoalsStore`-Stub oben.
-  let weightStoreStub: {
-    loading: ReturnType<typeof signal>;
-    loadError: ReturnType<typeof signal>;
-    hasEntries: ReturnType<typeof signal>;
-    chartPoints: ReturnType<typeof signal>;
-    chartSegments: ReturnType<typeof signal>;
-    chartYDomain: ReturnType<typeof signal>;
-    visibleSuggestion: ReturnType<typeof signal>;
-    sheetOpen: ReturnType<typeof signal>;
-    load: ReturnType<typeof vi.fn>;
-    retry: ReturnType<typeof vi.fn>;
-    openSheet: ReturnType<typeof vi.fn>;
-  };
-
   beforeEach(async () => {
     storeStub = {
       loading: signal(false),
@@ -55,28 +36,10 @@ describe('GoalsPageComponent', () => {
       savedValue: vi.fn(() => signal<number | null>(null)),
     };
 
-    weightStoreStub = {
-      loading: signal(false),
-      loadError: signal<string | null>(null),
-      hasEntries: signal(false),
-      chartPoints: signal([]),
-      chartSegments: signal([]),
-      chartYDomain: signal({ min: 0, max: 1 }),
-      visibleSuggestion: signal(null),
-      sheetOpen: signal(false),
-      load: vi.fn().mockResolvedValue(undefined),
-      retry: vi.fn(),
-      openSheet: vi.fn(),
-    };
-
     TestBed.resetTestingModule();
     await TestBed.configureTestingModule({
       imports: [GoalsPageComponent],
-      providers: [
-        provideRouter([]),
-        { provide: GoalsStore, useValue: storeStub },
-        { provide: WeightStore, useValue: weightStoreStub },
-      ],
+      providers: [provideRouter([]), { provide: GoalsStore, useValue: storeStub }],
     }).compileComponents();
   });
 
@@ -106,7 +69,9 @@ describe('GoalsPageComponent', () => {
     expect(fields).toHaveLength(4);
 
     const labels = Array.from(
-      fixture.nativeElement.querySelectorAll('.goal-fields .field-label') as NodeListOf<HTMLElement>,
+      fixture.nativeElement.querySelectorAll(
+        '.goal-fields .field-label',
+      ) as NodeListOf<HTMLElement>,
     ).map((el) => el.textContent?.trim());
     expect(labels).toEqual([
       'Kalorien-Ziel (kcal)',
@@ -116,15 +81,12 @@ describe('GoalsPageComponent', () => {
     ]);
   });
 
-  it('renders the target-weight field block as the first element of the weight-log section', () => {
+  it('no longer renders the weight-log section (moved to /gewicht, ADR-0019)', () => {
     const fixture = TestBed.createComponent(GoalsPageComponent);
     fixture.detectChanges();
 
-    const section = fixture.nativeElement.querySelector('.weight-log-section');
-    expect(section).toBeTruthy();
-
-    const label = section.querySelector('app-goal-field .field-label');
-    expect(label.textContent?.trim()).toBe('Gewicht-Ziel (kg)');
+    expect(fixture.nativeElement.querySelector('app-weight-log-section')).toBeNull();
+    expect(fixture.nativeElement.querySelectorAll('app-goal-field')).toHaveLength(4);
   });
 
   it('shows the loading skeleton and not the fields while loading', () => {

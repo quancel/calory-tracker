@@ -9,6 +9,7 @@ import {
   signal,
 } from '@angular/core';
 import { BottomSheetComponent } from '../../../shared/ui/bottom-sheet/bottom-sheet.component';
+import { formatWeightKg } from '../../../core/weight.calculations';
 import { ConfirmDialogComponent } from '../../../shared/ui/confirm-dialog/confirm-dialog.component';
 import { WeightStore } from '../../weight.store';
 
@@ -72,12 +73,8 @@ export class WeightEntrySheetComponent implements AfterViewInit {
     if (!pending) return '';
     // Deutsche Dezimalschreibweise (design-conventions.md: „72,4 kg wird
     // durch 72,1 kg ersetzt.") — Gewichte sind auf 1 Nachkommastelle
-    // validiert (weight.calculations.ts).
-    return `${this.formatWeight(pending.existingWeightKg)} kg wird durch ${this.formatWeight(pending.newWeightKg)} kg ersetzt.`;
-  }
-
-  private formatWeight(weightKg: number): string {
-    return weightKg.toFixed(1).replace('.', ',');
+    // validiert (core/weight.calculations.ts).
+    return `${formatWeightKg(pending.existingWeightKg)} kg wird durch ${formatWeightKg(pending.newWeightKg)} kg ersetzt.`;
   }
 
   protected onConfirmReplace(): void {

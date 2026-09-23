@@ -1,7 +1,10 @@
 import type { DiaryEntry } from './models/diary.model';
+import type { WeightLogEntry } from '../core/weight-logs.service';
 import {
   computeDayTotals,
   computeMealSections,
+  computeWeightTrendSummary,
+  formatWeightDelta,
   suggestedMealTypeForHour,
 } from './diary.calculations';
 
@@ -99,5 +102,52 @@ describe('computeMealSections', () => {
     const sections = computeMealSections(entries);
 
     expect(sections.find((s) => s.mealType === 'snack')?.kcal).toBeCloseTo(555);
+  });
+});
+
+describe('computeWeightTrendSummary / formatWeightDelta (ADR-0019)', () => {
+  const today = '2026-09-22';
+  const log = (dateKey: string, weightKg: number): WeightLogEntry => ({
+    id: dateKey,
+    dateKey,
+    weightKg,
+  });
+
+  it('returns an empty summary without measurements in the 30-day window', () => {
+    const summary = computeWeightTrendSummary([log('2026-08-01', 80)], today);
+    expect(summary.latest).toBeNull();
+    expect(summary.sparkline).toEqual([]);
+    expect(formatWeightDelta(summary)).toBeNull();
+  });
+
+  it('has no delta with a single measurement and centers the sparkline point vertically', () => {
+    const summary = computeWeightTrendSummary([log(today, 80)], today);
+    expect(summary.latest?.weightKg).toBe(80);
+    expect(summary.deltaKg).toBeNull();
+    expect(summary.sparkline).toEqual([{ x: 1, y: 0.5 }]);
+  });
+
+  it('computes latest minus oldest, sorted by date, and normalizes the sparkline', () => {
+    const summary = computeWeightTrendSummary(
+      [log('2026-09-22', 80.4), log('2026-08-24', 81.2), log('2026-09-10', 80.8)],
+      today,
+    );
+    expect(summary.latest?.dateKey).toBe('2026-09-22');
+    expect(summary.deltaKg).toBe(-0.8);
+    expect(summary.spanDays).toBe(29);
+    expect(summary.sparkline[0]).toEqual({ x: 0, y: 1 });
+    expect(summary.sparkline[2]).toEqual({ x: 1, y: 0 });
+    expect(formatWeightDelta(summary)).toBe('\u22120,8 kg in 29 Tagen');
+  });
+
+  it('formats gain, unchanged and a one-day span', () => {
+    expect(
+      formatWeightDelta(
+        computeWeightTrendSummary([log('2026-09-21', 80), log(today, 80.3)], today),
+      ),
+    ).toBe('+0,3 kg in 1 Tag');
+    expect(
+      formatWeightDelta(computeWeightTrendSummary([log('2026-09-15', 80), log(today, 80)], today)),
+    ).toBe('±0,0 kg in 7 Tagen');
   });
 });

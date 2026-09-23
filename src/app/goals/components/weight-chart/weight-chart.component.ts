@@ -10,7 +10,7 @@ import {
   signal,
 } from '@angular/core';
 import { diffInDays, formatDateLabel } from '../../../core/date.calculations';
-import type { WeightLogEntry } from '../../models/weight.model';
+import type { WeightLogEntry } from '../../../core/weight-logs.service';
 import type { WeightChartSegment, WeightChartYDomain } from '../../weight.calculations';
 
 /** Maximale Anzahl gleichzeitig sichtbarer X-Achsen-Datumslabels — mehr würde bei bis zu 90 Punkten überlappen. */

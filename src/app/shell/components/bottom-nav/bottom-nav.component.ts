@@ -4,7 +4,8 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
 /**
  * Bottom-Navigation (design-conventions.md „Bottom-Navigation (final,
  * Paket 012)"): projektweit gültig für alle Ansichten hinter dem Login.
- * Zwei Tabs, `/tagebuch` und `/verlauf` — `/ziele` und `/mahlzeiten` sind
+ * Drei Tabs, `/tagebuch`, `/gewicht` (ADR-0019) und `/verlauf` — `/ziele`
+ * und `/mahlzeiten` sind
  * tab-lose Kinder derselben Layout-Route (ADR-0014 Punkt 1/3) und zeigen
  * diese Navigation ebenfalls, markieren dabei aber keinen Tab aktiv:
  * `routerLinkActive` mit `exact: true` vergleicht nur gegen die eigene

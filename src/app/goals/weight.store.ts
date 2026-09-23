@@ -1,19 +1,19 @@
 import { Injectable, type Signal, computed, inject, signal } from '@angular/core';
 import { addDaysToKey, todayKey } from '../core/date.calculations';
+import { type WeightEntryValidation, validateWeightEntry } from '../core/weight.calculations';
+import { type WeightLogEntry, WeightLogsService } from '../core/weight-logs.service';
 import { GoalsService } from './goals.service';
 import { GoalsStore } from './goals.store';
-import type { CalorieSuggestionResult, IntakeDay, WeightLogEntry } from './models/weight.model';
+import type { CalorieSuggestionResult, IntakeDay } from './models/weight.model';
 import {
   WEIGHT_CHART_WINDOW_DAYS,
   WEIGHT_TREND_WINDOW_DAYS,
   type WeightChartSegment,
   type WeightChartYDomain,
-  type WeightEntryValidation,
   buildWeightChartSegments,
   computeCalorieSuggestion,
   computeWeightChartYDomain,
   filterWeightChartWindow,
-  validateWeightEntry,
 } from './weight.calculations';
 
 interface PendingReplace {
@@ -31,11 +31,13 @@ interface PendingReplace {
  * (ADR-0018 Punkt 6) und zur Übernahme eines Vorschlags in das
  * Kalorien-Feld (`GoalsStore.setInput('kcal', …)` + `save('kcal')`,
  * ADR-0017 Punkt 5) — `goals.service.ts` bleibt der einzige Schreibweg auf
- * `goals`, `WeightStore` schreibt dort nie selbst.
+ * `goals`, `WeightStore` schreibt dort nie selbst. Messungen lesen/schreiben
+ * läuft seit ADR-0019 über `core/weight-logs.service.ts`.
  */
 @Injectable({ providedIn: 'root' })
 export class WeightStore {
   private readonly goalsService = inject(GoalsService);
+  private readonly weightLogsService = inject(WeightLogsService);
   private readonly goalsStore = inject(GoalsStore);
 
   private readonly logsState = signal<WeightLogEntry[]>([]);
@@ -110,7 +112,7 @@ export class WeightStore {
    * Lädt Gewichtsmessungen (90-Tage-Diagrammfenster, deckt das 28-Tage-
    * Trendfenster vollständig ab) und die Ist-Zufuhr (28-Tage-Trendfenster)
    * parallel. Aufgerufen beim Aktivieren der Ziele-Route, analog
-   * `GoalsStore.load()`.
+   * `GoalsStore.load()` — seit ADR-0019 die Gewicht-Route `/gewicht`.
    */
   async load(): Promise<void> {
     this.loadingState.set(true);
@@ -121,7 +123,7 @@ export class WeightStore {
     const trendStartKey = addDaysToKey(today, -(WEIGHT_TREND_WINDOW_DAYS - 1));
 
     const [logsResult, intakeResult] = await Promise.all([
-      this.goalsService.loadWeightLogs(chartStartKey, today),
+      this.weightLogsService.loadWeightLogs(chartStartKey, today),
       this.goalsService.loadIntake(trendStartKey, today),
     ]);
 
@@ -198,7 +200,7 @@ export class WeightStore {
     this.savingState.set(true);
     this.submitErrorState.set(null);
 
-    const result = await this.goalsService.upsertWeightLog(todayKey(), weightKg);
+    const result = await this.weightLogsService.upsertWeightLog(todayKey(), weightKg);
 
     this.savingState.set(false);
     this.pendingReplaceState.set(null);

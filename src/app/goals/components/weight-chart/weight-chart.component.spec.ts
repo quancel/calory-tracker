@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import type { WeightLogEntry } from '../../models/weight.model';
+import type { WeightLogEntry } from '../../../core/weight-logs.service';
 import { buildWeightChartSegments, computeWeightChartYDomain } from '../../weight.calculations';
 import { WeightChartComponent } from './weight-chart.component';
 

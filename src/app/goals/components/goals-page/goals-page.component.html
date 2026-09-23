@@ -46,23 +46,5 @@
         />
       }
     </div>
-
-    <section class="weight-log-section" aria-labelledby="weight-log-heading">
-      <h2 id="weight-log-heading" class="section-heading">Gewichtslog</h2>
-
-      <app-goal-field
-        [label]="targetWeightField.label"
-        [unit]="targetWeightField.unit"
-        [value]="goalsStore.inputValue('targetWeightKg')()"
-        [validationError]="goalsStore.validationError('targetWeightKg')()"
-        [canSave]="goalsStore.canSave('targetWeightKg')()"
-        [saveState]="goalsStore.saveState('targetWeightKg')()"
-        [saveErrorMessage]="goalsStore.saveErrorMessage('targetWeightKg')()"
-        (valueChange)="goalsStore.setInput('targetWeightKg', $event)"
-        (save)="goalsStore.save('targetWeightKg')"
-      />
-
-      <app-weight-log-section />
-    </section>
   }
 </div>

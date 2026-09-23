@@ -58,6 +58,18 @@ describe('DiaryShellComponent', () => {
     dismissFeedback: ReturnType<typeof vi.fn>;
     clearAllFeedback: ReturnType<typeof vi.fn>;
     retrySync: ReturnType<typeof vi.fn>;
+    // Gewichtskarte (ADR-0019) — rendert im Shell-Test mit.
+    weightLoadError: ReturnType<typeof signal>;
+    weightTrend: ReturnType<typeof signal>;
+    weightDeltaText: ReturnType<typeof signal>;
+    dayWeight: ReturnType<typeof signal>;
+    canLogWeight: ReturnType<typeof signal>;
+    weightDayLabel: ReturnType<typeof signal>;
+    weightInput: ReturnType<typeof signal>;
+    weightEditing: ReturnType<typeof signal>;
+    weightSubmitError: ReturnType<typeof signal>;
+    weightValidation: ReturnType<typeof signal>;
+    canSubmitWeight: ReturnType<typeof signal>;
   };
 
   beforeEach(async () => {
@@ -91,6 +103,17 @@ describe('DiaryShellComponent', () => {
       dismissFeedback: vi.fn(),
       clearAllFeedback: vi.fn(),
       retrySync: vi.fn().mockResolvedValue(undefined),
+      weightLoadError: signal<string | null>(null),
+      weightTrend: signal({ latest: null, deltaKg: null, spanDays: 0, sparkline: [], values: [] }),
+      weightDeltaText: signal<string | null>(null),
+      dayWeight: signal(null),
+      canLogWeight: signal(true),
+      weightDayLabel: signal('heute'),
+      weightInput: signal(''),
+      weightEditing: signal(false),
+      weightSubmitError: signal<string | null>(null),
+      weightValidation: signal({ valid: false, error: 'Bitte ein Gewicht eingeben.' }),
+      canSubmitWeight: signal(false),
     };
 
     TestBed.resetTestingModule();
@@ -397,5 +420,15 @@ describe('DiaryShellComponent', () => {
     fixture.destroy();
 
     expect(storeStub.clearAllFeedback).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders the weight card below the summary with a link to /gewicht (ADR-0019)', () => {
+    const fixture = TestBed.createComponent(DiaryShellComponent);
+    fixture.detectChanges();
+
+    const card = fixture.nativeElement.querySelector('app-weight-card');
+    expect(card).toBeTruthy();
+    expect(card.querySelector('a.details-link').getAttribute('href')).toBe('/gewicht');
+    expect(card.querySelector('#diary-weight-input')).toBeTruthy();
   });
 });

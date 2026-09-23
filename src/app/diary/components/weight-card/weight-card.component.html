@@ -1,0 +1,108 @@
+<section class="weight-card" aria-labelledby="weight-card-title">
+  <div class="card-header">
+    <h2 id="weight-card-title" class="card-title">Gewicht</h2>
+    <a routerLink="/gewicht" class="details-link">
+      <span>Verlauf</span>
+      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+        <path
+          d="M9 5l7 7-7 7"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+    </a>
+  </div>
+
+  @if (store.weightLoadError(); as message) {
+    <div class="load-error" role="alert">
+      <p class="muted-text">{{ message }}</p>
+      <button type="button" class="text-button" (click)="store.retryWeight()">
+        Erneut versuchen
+      </button>
+    </div>
+  } @else {
+    @if (latestText(); as latest) {
+      <div class="trend-row">
+        <div class="trend-values">
+          <span class="latest-value tnum">{{ latest }}</span>
+          @if (store.weightDeltaText(); as delta) {
+            <span class="delta-text tnum">{{ delta }}</span>
+          } @else {
+            <span class="delta-text">Erster Eintrag der letzten 30 Tage</span>
+          }
+        </div>
+
+        @if (store.weightTrend().sparkline.length > 1) {
+          <svg
+            class="sparkline"
+            [attr.viewBox]="'0 0 ' + sparklineWidth + ' ' + sparklineHeight"
+            [attr.width]="sparklineWidth"
+            [attr.height]="sparklineHeight"
+            aria-hidden="true"
+          >
+            <polyline class="sparkline-line" [attr.points]="sparklinePath()" />
+            @if (sparklineEnd(); as end) {
+              <circle class="sparkline-end" [attr.cx]="end.x" [attr.cy]="end.y" r="2.5" />
+            }
+          </svg>
+        }
+      </div>
+
+      <ul class="sr-only" aria-label="Gewichtseinträge der letzten 30 Tage">
+        @for (value of srValues(); track value.id) {
+          <li>{{ value.text }}</li>
+        }
+      </ul>
+    } @else {
+      <p class="muted-text">Noch keine Gewichtseinträge in den letzten 30 Tagen.</p>
+    }
+
+    @if (store.canLogWeight()) {
+      @if (showForm()) {
+        <form class="entry-form" (submit)="onSubmit($event)">
+          <label class="field-label" for="diary-weight-input">
+            Gewicht {{ store.weightDayLabel() }} (kg)
+          </label>
+          <div class="field-row">
+            <input
+              id="diary-weight-input"
+              class="field-input tnum"
+              type="text"
+              inputmode="decimal"
+              autocomplete="off"
+              [value]="store.weightInput()"
+              [attr.aria-invalid]="displayedError() ? true : null"
+              aria-describedby="diary-weight-feedback"
+              (input)="onInput($event)"
+              (blur)="onBlur()"
+            />
+            <button type="submit" class="save-button" [disabled]="!store.canSubmitWeight()">
+              Speichern
+            </button>
+          </div>
+          <div class="field-feedback" id="diary-weight-feedback" role="status" aria-live="polite">
+            @if (displayedError(); as message) {
+              <p class="field-error">{{ message }}</p>
+            }
+          </div>
+          @if (store.weightEditing()) {
+            <button type="button" class="text-button cancel-button" (click)="onCancelEdit()">
+              Abbrechen
+            </button>
+          }
+        </form>
+      } @else {
+        <div class="day-row">
+          <p class="day-text">
+            Gewicht {{ store.weightDayLabel() }}:
+            <strong class="tnum">{{ dayWeightText() }}</strong>
+          </p>
+          <button type="button" class="secondary-button" (click)="onEdit()">Ändern</button>
+        </div>
+      }
+    }
+  }
+</section>

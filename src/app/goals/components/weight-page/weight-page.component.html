@@ -1,0 +1,33 @@
+<div class="weight-page">
+  <header class="weight-header">
+    <h1 class="weight-title">Gewicht</h1>
+  </header>
+
+  @if (goalsStore.loading()) {
+    <div class="state-loading" aria-busy="true" aria-live="polite">
+      <div class="skeleton skeleton-field"></div>
+      <div class="skeleton skeleton-chart"></div>
+    </div>
+  } @else if (goalsStore.loadError(); as message) {
+    <div class="state-error" role="alert">
+      <p class="error-text">{{ message }}</p>
+      <button type="button" class="retry-button" (click)="goalsStore.retry()">
+        Erneut versuchen
+      </button>
+    </div>
+  } @else {
+    <app-goal-field
+      [label]="targetWeightField.label"
+      [unit]="targetWeightField.unit"
+      [value]="goalsStore.inputValue('targetWeightKg')()"
+      [validationError]="goalsStore.validationError('targetWeightKg')()"
+      [canSave]="goalsStore.canSave('targetWeightKg')()"
+      [saveState]="goalsStore.saveState('targetWeightKg')()"
+      [saveErrorMessage]="goalsStore.saveErrorMessage('targetWeightKg')()"
+      (valueChange)="goalsStore.setInput('targetWeightKg', $event)"
+      (save)="goalsStore.save('targetWeightKg')"
+    />
+
+    <app-weight-log-section />
+  }
+</div>

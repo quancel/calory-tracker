@@ -4,7 +4,7 @@ import { authGuard, redirectIfAuthenticatedGuard } from './core/auth.guard';
 /**
  * Top-Level-Routen — alles lazy (siehe code-conventions.md).
  *
- * Alle vier geschützten Ansichten (`tagebuch`, `verlauf`, `ziele`,
+ * Alle geschützten Ansichten (`tagebuch`, `gewicht`, `verlauf`, `ziele`,
  * `mahlzeiten`) liegen ab Paket PO-2026-09-20-012 als `children` unter
  * einer pfadlosen Layout-Route (ADR-0014 Punkt 1): der `authGuard` steht
  * **einmal** hier statt viermal an den Kindern. `MainLayoutComponent`
@@ -48,6 +48,12 @@ export const routes: Routes = [
         loadChildren: () => import('./diary/diary.routes').then((m) => m.DIARY_ROUTES),
       },
       {
+        // Eigener Tab für Gewichtslog, großes Diagramm und Zielgewicht
+        // (ADR-0019) — Komponente liegt im Feature `goals`.
+        path: 'gewicht',
+        loadChildren: () => import('./goals/weight.routes').then((m) => m.WEIGHT_ROUTES),
+      },
+      {
         path: 'verlauf',
         loadChildren: () => import('./stats/stats.routes').then((m) => m.STATS_ROUTES),
       },
@@ -65,7 +71,8 @@ export const routes: Routes = [
     path: 'eintrag-erfassen',
     outlet: 'sheet',
     canActivate: [authGuard],
-    loadChildren: () => import('./food-search/food-search.routes').then((m) => m.FOOD_SEARCH_ROUTES),
+    loadChildren: () =>
+      import('./food-search/food-search.routes').then((m) => m.FOOD_SEARCH_ROUTES),
   },
   {
     // Zweite Auxiliary-Route im Outlet `sheet` (ADR-0012 Punkt 9) — das

@@ -155,7 +155,10 @@ src/
   Laufzeit-Abhängigkeit für Visualisierung (ADR-0006 Punkt 5, ADR-0014
   Punkt 4). Jeder Datenpunkt ist ein fokussierbares interaktives Element mit
   vollständigem `aria-label`, zusätzlich existiert eine `sr-only`-Tabellen-
-  oder Listenalternative mit denselben Werten.
+  oder Listenalternative mit denselben Werten. Ausnahme: rein andeutende
+  Sparklines (Gewichtskarte im Tagebuch, ADR-0019 Punkt 6) sind
+  `aria-hidden`, ihre Aussage steht als Text daneben, Werte als
+  `sr-only`-Liste.
 - Overlay/Bottom-Sheet, das aus einem **anderen** Feature heraus geöffnet
   wird: als lazy Route im benannten Outlet `sheet` in `app.routes.ts`
   (zweites `<router-outlet name="sheet">` in `app.html`); die Komponente
@@ -301,15 +304,21 @@ src/
 - Mengenumrechnung eines Eintrags (`amount_g / 100 × Wert je 100 g`):
   `computeLiveNutrition()` aus `src/app/core/foods.calculations.ts` — kein
   Feature schreibt die Formel erneut.
-- Gewichtslog und Kalorienziel-Vorschlag liegen vollständig im Feature
-  `goals` (ADR-0017): `goals/weight.store.ts` (zweiter Store im Feature —
-  ausdrücklich durch ADR-0017 Punkt 5 gedeckte Ausnahme),
-  `goals/weight.calculations.ts` (Regressionsrechnung, Mindestdatenlage,
-  Wertebereiche, **alle** Konstanten der Rechenregel),
-  `goals/models/weight.model.ts`, `goals/components/weight-*/`. Der
-  Tabellenzugriff auf `weight_logs` bleibt in `goals/goals.service.ts` —
-  keine zweite Servicedatei, kein `stats`-Bezug, kein `shared/`-Umzug des
-  Charts (ein Nutzer). Die **Rechenregel** des Vorschlags ist seit ADR-0018
+- Gewichtslog und Kalorienziel-Vorschlag liegen im Feature `goals`
+  (ADR-0017), die Ansicht ist seit ADR-0019 der eigene Tab `/gewicht`
+  (`goals/components/weight-page/`, Route `goals/weight.routes.ts`):
+  `goals/weight.store.ts` (zweiter Store im Feature — ausdrücklich durch
+  ADR-0017 Punkt 5 gedeckte Ausnahme), `goals/weight.calculations.ts`
+  (Regressionsrechnung, Mindestdatenlage, Diagramm, **alle** Konstanten der
+  Rechenregel), `goals/models/weight.model.ts`, `goals/components/weight-*/`.
+  Der Tabellenzugriff auf `weight_logs` liegt seit ADR-0019 **ausschließlich**
+  in `src/app/core/weight-logs.service.ts` (zweiter Nutzer `diary`,
+  `revision`-Signal wie bei `entries`), ebenso der Typ `WeightLogEntry`.
+  Wertebereich, `validateWeightEntry` und `formatWeightKg`:
+  `src/app/core/weight.calculations.ts`. Die Gewichtskarte im Tagebuch
+  (`diary/components/weight-card/`) hält ihren Zustand im `DiaryStore`, der
+  Mini-Verlauf wird in `diary.calculations.ts` berechnet. Kein `stats`-Bezug,
+  kein `shared/`-Umzug des großen Charts (ein Nutzer). Die **Rechenregel** des Vorschlags ist seit ADR-0018
   zielbasiert (ADR-0017 Punkt 3 ist abgelöst); sie gibt einen **Summentyp**
   (`'no-entries' | 'no-target' | 'insufficient' | { kind: 'suggestion',
   kcal, holding }`) zurück, keine Zahl mit Sonderwerten — die Komponente

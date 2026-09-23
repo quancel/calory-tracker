@@ -1,6 +1,7 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { todayKey } from '../core/date.calculations';
+import { WeightLogsService } from '../core/weight-logs.service';
 import { GoalsService } from './goals.service';
 import { GoalsStore } from './goals.store';
 import { WeightStore } from './weight.store';
@@ -9,7 +10,11 @@ describe('WeightStore', () => {
   let loadWeightLogs: ReturnType<typeof vi.fn>;
   let loadIntake: ReturnType<typeof vi.fn>;
   let upsertWeightLog: ReturnType<typeof vi.fn>;
-  let goalsStoreStub: { savedValue: ReturnType<typeof vi.fn>; setInput: ReturnType<typeof vi.fn>; save: ReturnType<typeof vi.fn> };
+  let goalsStoreStub: {
+    savedValue: ReturnType<typeof vi.fn>;
+    setInput: ReturnType<typeof vi.fn>;
+    save: ReturnType<typeof vi.fn>;
+  };
   let targetWeightKg: ReturnType<typeof signal<number | null>>;
 
   beforeEach(() => {
@@ -34,9 +39,10 @@ describe('WeightStore', () => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       providers: [
+        { provide: GoalsService, useValue: { loadIntake } },
         {
-          provide: GoalsService,
-          useValue: { loadWeightLogs, loadIntake, upsertWeightLog, deleteWeightLog: vi.fn() },
+          provide: WeightLogsService,
+          useValue: { loadWeightLogs, upsertWeightLog, deleteWeightLog: vi.fn() },
         },
         { provide: GoalsStore, useValue: goalsStoreStub },
       ],

@@ -27,6 +27,7 @@ Bounded Context zum aktuellen Paket passt, plus deren `superseded by`-Ketten.
 | `0016` | Offline-Puffer — client-vergebene Eintrags-UUID als Idempotenzschlüssel, IndexedDB-Queue hinter `core/entries.service.ts`, neuer Bounded Context `offline-sync` | `offline-sync`, `diary`, `food-catalog`, `meals`, `app-shell`, `data-platform` | `accepted` | 2026-09-22 |
 | `0017` | Gewichtslog & Kalorienziel-Vorschlag — Gewichtslog als Teil von `goals`, `weight_logs` mit `unique (user_id, date)`, festgelegte Rechenregel (28-Tage-Fenster, lineare Regression, 7700 kcal/kg), zweiter Store im Feature `goals` | `goals`, `data-platform`, `stats`, `app-shell`, `offline-sync` | `superseded by ADR-0018` (nur Punkt 3; Punkte 1, 2, 4–9 gelten fort) | 2026-09-22 |
 | `0018` | Zielbasierter Kalorienziel-Vorschlag & Zielgewicht in `goals` — trendkorrigierte Zielrate mit Wochen-Obergrenzen (0,5 kg ab / 0,25 kg zu), Halten-Toleranz ±0,5 kg, `goals.target_weight_kg` nullable (löst ADR-0017 Punkt 3 ab) | `goals`, `data-platform` | `accepted` | 2026-09-22 |
+| `0019` | Gewicht als eigener Tab `/gewicht`, Schnelleingabe + Mini-Verlauf im Tagebuch, `weight_logs`-Zugriff in `core/weight-logs.service.ts` mit `revision`-Signal (löst den Service-Teil von ADR-0017 Punkt 5 ab) | `goals`, `diary`, `app-shell` | `accepted` | 2026-09-23 |
 
 **Status-Werte** wörtlich wie im ADR selbst: `proposed` · `accepted` ·
 `superseded by ADR-NNNN`.

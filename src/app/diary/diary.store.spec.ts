@@ -4,6 +4,7 @@ import { EntriesService } from '../core/entries.service';
 import { EntryQueueService, type QueueEntry } from '../core/entry-queue.service';
 import { LOCAL_DB_NAME, LocalDbService } from '../core/local-db.service';
 import { addDaysToKey, todayKey } from '../core/date.calculations';
+import { WeightLogsService } from '../core/weight-logs.service';
 import { DiaryService } from './diary.service';
 import { DiaryStore } from './diary.store';
 import type { DiaryEntry } from './models/diary.model';
@@ -15,6 +16,15 @@ function resetDatabase(): Promise<void> {
     request.onerror = () => reject(request.error);
     request.onblocked = () => resolve();
   });
+}
+
+/** Neutraler Stub für die Gewichtskarte (ADR-0019) — hält die übrigen Tests von Supabase fern. */
+function weightLogsStub() {
+  return {
+    revision: signal(0),
+    loadWeightLogs: vi.fn().mockResolvedValue({ success: true, logs: [] }),
+    upsertWeightLog: vi.fn().mockResolvedValue({ success: true }),
+  };
 }
 
 /**
@@ -90,6 +100,7 @@ describe('DiaryStore', () => {
     TestBed.configureTestingModule({
       providers: [
         { provide: DiaryService, useValue: { loadDay, loadGoal, loadCopySource } },
+        { provide: WeightLogsService, useValue: weightLogsStub() },
         {
           provide: EntriesService,
           useValue: { revision: signal(0), createEntries, deleteEntries, retryEntry },
@@ -217,6 +228,7 @@ describe('DiaryStore', () => {
     TestBed.configureTestingModule({
       providers: [
         { provide: DiaryService, useValue: { loadDay, loadGoal, loadCopySource } },
+        { provide: WeightLogsService, useValue: weightLogsStub() },
         { provide: EntriesService, useValue: { revision, createEntries, deleteEntries } },
       ],
     });
@@ -267,6 +279,7 @@ describe('DiaryStore — „gestern kopieren" (ADR-0013)', () => {
     TestBed.configureTestingModule({
       providers: [
         { provide: DiaryService, useValue: { loadDay, loadGoal, loadCopySource } },
+        { provide: WeightLogsService, useValue: weightLogsStub() },
         {
           provide: EntriesService,
           useValue: { revision: signal(0), createEntries, deleteEntries, retryEntry },
@@ -420,6 +433,7 @@ describe('DiaryStore — „gestern kopieren" (ADR-0013)', () => {
     TestBed.configureTestingModule({
       providers: [
         { provide: DiaryService, useValue: { loadDay, loadGoal, loadCopySource } },
+        { provide: WeightLogsService, useValue: weightLogsStub() },
         { provide: EntriesService, useValue: { revision, createEntries, deleteEntries } },
       ],
     });
@@ -480,5 +494,131 @@ describe('DiaryStore — „gestern kopieren" (ADR-0013)', () => {
 
       expect(retryEntry).toHaveBeenCalledWith('q1');
     });
+  });
+});
+
+describe('DiaryStore — Gewichtskarte (ADR-0019)', () => {
+  let weightLogs: ReturnType<typeof weightLogsStub>;
+
+  beforeEach(async () => {
+    await resetDatabase();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 8, 22, 12, 0, 0));
+
+    weightLogs = weightLogsStub();
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        {
+          provide: DiaryService,
+          useValue: {
+            loadDay: vi.fn().mockResolvedValue({ success: true, entries: [], goal: null }),
+            loadGoal: vi.fn().mockResolvedValue({ success: true, goal: null }),
+            loadCopySource: vi.fn().mockResolvedValue({ success: true, entries: [] }),
+          },
+        },
+        {
+          provide: EntriesService,
+          useValue: { revision: signal(0), createEntries: vi.fn(), deleteEntries: vi.fn() },
+        },
+        { provide: WeightLogsService, useValue: weightLogs },
+      ],
+    });
+  });
+
+  afterEach(async () => {
+    vi.useRealTimers();
+    await TestBed.inject(LocalDbService).close();
+  });
+
+  it('loads the last 30 days up to today and exposes the trend summary', async () => {
+    weightLogs.loadWeightLogs.mockResolvedValue({
+      success: true,
+      logs: [
+        { id: 'a', dateKey: '2026-09-08', weightKg: 81.2 },
+        { id: 'b', dateKey: '2026-09-22', weightKg: 80.4 },
+      ],
+    });
+
+    const store = TestBed.inject(DiaryStore);
+    await flush();
+
+    expect(weightLogs.loadWeightLogs).toHaveBeenCalledWith('2026-08-24', '2026-09-22');
+    expect(store.weightTrend().latest?.weightKg).toBe(80.4);
+    expect(store.weightDeltaText()).toBe('\u22120,8 kg in 14 Tagen');
+    expect(store.dayWeight()?.id).toBe('b');
+  });
+
+  it('saves the weight for the displayed day and resets the input', async () => {
+    const store = TestBed.inject(DiaryStore);
+    await flush();
+    await store.goToPreviousDay();
+
+    store.setWeightInput('79,9');
+    await store.saveWeight();
+
+    expect(weightLogs.upsertWeightLog).toHaveBeenCalledWith('2026-09-21', 79.9);
+    expect(store.weightInput()).toBe('');
+  });
+
+  it('does not save an invalid value', async () => {
+    const store = TestBed.inject(DiaryStore);
+    await flush();
+
+    store.setWeightInput('12');
+    await store.saveWeight();
+
+    expect(weightLogs.upsertWeightLog).not.toHaveBeenCalled();
+  });
+
+  it('keeps the input and exposes the error when saving fails', async () => {
+    weightLogs.upsertWeightLog.mockResolvedValue({
+      success: false,
+      message: 'Gewicht konnte nicht gespeichert werden.',
+    });
+    const store = TestBed.inject(DiaryStore);
+    await flush();
+
+    store.setWeightInput('80');
+    await store.saveWeight();
+
+    expect(store.weightSubmitError()).toBe('Gewicht konnte nicht gespeichert werden.');
+    expect(store.weightInput()).toBe('80');
+  });
+
+  it('prefills the input with the existing value when editing', async () => {
+    weightLogs.loadWeightLogs.mockResolvedValue({
+      success: true,
+      logs: [{ id: 'b', dateKey: '2026-09-22', weightKg: 80.4 }],
+    });
+    const store = TestBed.inject(DiaryStore);
+    await flush();
+
+    store.startWeightEdit();
+    expect(store.weightEditing()).toBe(true);
+    expect(store.weightInput()).toBe('80,4');
+
+    store.cancelWeightEdit();
+    expect(store.weightEditing()).toBe(false);
+    expect(store.weightInput()).toBe('');
+  });
+
+  it('does not allow logging weight for a future day', async () => {
+    const store = TestBed.inject(DiaryStore);
+    await flush();
+    expect(store.canLogWeight()).toBe(true);
+
+    await store.goToNextDay();
+    expect(store.canLogWeight()).toBe(false);
+  });
+
+  it('reloads the measurements when WeightLogsService.revision changes', async () => {
+    TestBed.inject(DiaryStore);
+    await flush();
+    expect(weightLogs.loadWeightLogs).toHaveBeenCalledTimes(1);
+
+    weightLogs.revision.set(1);
+    await flush();
+    expect(weightLogs.loadWeightLogs).toHaveBeenCalledTimes(2);
   });
 });

@@ -14,6 +14,7 @@
  */
 
 import type { MealType } from '../../core/meal-type.constants';
+import type { WeightLogEntry } from '../../core/weight-logs.service';
 
 export interface DiaryEntryFood {
   id: string;
@@ -104,4 +105,23 @@ export interface CopyUndoState {
 export interface CopyFeedbackView {
   sourceDateLabel: string;
   count: number;
+}
+
+/** Normalisierter Sparkline-Punkt (`0…1` je Achse), siehe `computeWeightTrendSummary`. */
+export interface SparklinePoint {
+  readonly x: number;
+  readonly y: number;
+}
+
+/** Mini-Verlauf der Gewichtskarte auf der Tagesansicht (ADR-0019). */
+export interface WeightTrendSummary {
+  /** Jüngste Messung im Fenster, `null` ohne Messung. */
+  readonly latest: WeightLogEntry | null;
+  /** Jüngste minus älteste Messung im Fenster, auf 0,1 kg gerundet; `null` bei weniger als zwei Messungen. */
+  readonly deltaKg: number | null;
+  /** Tage zwischen ältester und jüngster Messung im Fenster. */
+  readonly spanDays: number;
+  readonly sparkline: readonly SparklinePoint[];
+  /** Messungen im Fenster, aufsteigend — für die `sr-only`-Liste. */
+  readonly values: readonly WeightLogEntry[];
 }

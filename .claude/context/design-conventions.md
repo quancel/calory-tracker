@@ -397,9 +397,9 @@ vorkommen, ohne sich zu widersprechen.
 
 Projektweit gültig für alle Ansichten hinter dem Login ab jetzt.
 
-- **Zwei Tabs**: **Tagebuch**, **Verlauf**. „Ziele" ist **kein** eigener
-  Tab, sondern eine Einstellungsseite über das Zahnrad-/Profil-Icon
-  (Paket 005) — bleibt unverändert.
+- **Drei Tabs** (seit ADR-0019): **Tagebuch**, **Gewicht**, **Verlauf**.
+  „Ziele" ist **kein** eigener Tab, sondern eine Einstellungsseite über das
+  Zahnrad-/Profil-Icon (Paket 005) — bleibt unverändert.
 - **Layout**: fixiert am unteren Bildschirmrand, `--color-surface`-Fläche,
   1px `--color-border` als Top-Trennlinie (bewusste Ausnahme von „Abstand
   statt Linie" — Navigationsleisten grenzen sich üblicherweise über eine
@@ -421,7 +421,8 @@ Projektweit gültig für alle Ansichten hinter dem Login ab jetzt.
   Tages-Eingabekontext, daher kein Eingabe-Einstieg dort. Sektions-Buttons
   existieren ohnehin nur innerhalb des Tagebuchs.
 - Icons (Vorschlag aus dem bestehenden Outline-Set): Tagebuch =
-  `notebook-text`, Verlauf = `bar-chart-2`.
+  `notebook-text`, Gewicht = Waage (abgerundetes Quadrat mit Skalenbogen),
+  Verlauf = `bar-chart-2`.
 
 ## Verlauf: Zeitraum-Navigation, Balken-Chart mit Detail-Tooltip (Paket 012)
 
@@ -915,10 +916,14 @@ erkennen oder besonders behandeln muss.
 
 ## Gewichtslog & Kalorienziel-Vorschlag (Paket 015)
 
-Lebt vollständig in der bestehenden **Ziele-Ansicht** (Einstellungsseite über
-das Zahnrad-/Profil-Icon, siehe „Bottom-Navigation" — kein eigener Tab, kein
-neuer Navigationseinstieg), als eigener Abschnitt unterhalb der bestehenden
-Kalorien-/Makro-Feldblöcke (siehe „Feldblock mit unabhängigem Speichern").
+> **Seit ADR-0019** lebt dieser Abschnitt unverändert im eigenen Tab
+> **Gewicht** (`/gewicht`) statt in der Ziele-Ansicht; die Aussagen unten zu
+> „Ziele-Ansicht"/„kein eigener Tab" sind insoweit überholt. Zusätzlich gibt
+> es die **Gewichtskarte im Tagebuch** (siehe unten).
+
+Ursprünglich: in der **Ziele-Ansicht** als eigener Abschnitt unterhalb der
+bestehenden Kalorien-/Makro-Feldblöcke (siehe „Feldblock mit unabhängigem
+Speichern").
 
 ### Zielgewicht-Feldblock (ergänzt in Runde der Design-Nachpflege 2026-09-22)
 
@@ -1095,3 +1100,28 @@ zutreffende Bedingung gewinnt**:
   Gewichtseinträge" + der „+"-Button aus dem Erfassen-Einstieg bleibt
   sichtbar/bedienbar als einziger Call-to-Action (gleiches Wortmuster wie
   andere Leerzustände, z. B. „Gespeicherte Mahlzeiten"/Verlauf).
+
+## Gewichtskarte im Tagebuch (ADR-0019)
+
+- Karte nach dem Muster „Karten/Listen" (`--color-surface`, `--radius-md`,
+  `--elevation-flat`, Innenabstand `--space-4`), direkt unter Kalorienring
+  und Makro-Balken, vor den Mahlzeiten-Sektionen.
+- **Kopfzeile**: Titel „Gewicht" (`--font-size-md`, semibold), rechts
+  Textlink „Verlauf ›" (`--color-accent`) auf `/gewicht`.
+- **Trendzeile**: jüngster Wert der letzten 30 Tage groß
+  (`--font-size-xl`, `.tnum`), darunter die Veränderung ältester → jüngster
+  Wert als Text („−0,8 kg in 14 Tagen", `--font-size-xs`,
+  `--color-text-muted`, neutral — keine Wertung per Farbe, weil Zu- und
+  Abnahme je nach Ziel gut oder schlecht sind). Rechts eine Sparkline
+  96×32px, `--color-accent`-Linie 2px, gefüllter Endpunkt, keine Achsen.
+  Bei einer einzigen Messung: „Erster Eintrag der letzten 30 Tage", keine
+  Sparkline. Ohne Messung: „Noch keine Gewichtseinträge in den letzten 30
+  Tagen."
+- **Schnelleingabe** für den angezeigten Tag: Feldblock-Muster (Label
+  oberhalb „Gewicht heute (kg)" / „gestern" / Wochentag + Datum, Input +
+  „Speichern" in einer Zeile, Validierung on-blur, danach live). Ist schon
+  ein Wert erfasst: Zeile „Gewicht heute: 72,4 kg" + neutraler Button
+  „Ändern", der das vorbelegte Feld plus „Abbrechen" zeigt — ersetzt den
+  Bestätigungsdialog. Für zukünftige Tage keine Eingabe.
+- Ladefehler der Messungen: Hinweistext + „Erneut versuchen" in der Karte,
+  Eingabe ausgeblendet; der Tagesinhalt bleibt unberührt.

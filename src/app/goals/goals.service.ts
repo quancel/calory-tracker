@@ -2,28 +2,18 @@ import { Injectable, inject } from '@angular/core';
 import { SupabaseService } from '../core/supabase.service';
 import { goalFieldConfig } from './goals.calculations';
 import type { GoalFieldKey, GoalValues } from './models/goal.model';
-import type { IntakeDay, WeightLogEntry } from './models/weight.model';
+import type { IntakeDay } from './models/weight.model';
 
 /** Domain-Ergebnis eines Ziel-Ladevorgangs — kein Supabase-Typ nach außen. */
 export type LoadGoalResult =
-  | { success: true; goal: GoalValues | null }
-  | { success: false; message: string };
+  { success: true; goal: GoalValues | null } | { success: false; message: string };
 
 /** Domain-Ergebnis eines einzelnen Feld-Speichervorgangs. */
 export type SaveGoalFieldResult = { success: true } | { success: false; message: string };
 
-/** Domain-Ergebnis eines Gewichtslog-Ladevorgangs (letzte `WEIGHT_CHART_WINDOW_DAYS` Tage, ADR-0017 Punkt 7). */
-export type LoadWeightLogsResult =
-  | { success: true; logs: WeightLogEntry[] }
-  | { success: false; message: string };
-
 /** Domain-Ergebnis des Ist-Zufuhr-Ladevorgangs für den Vorschlag (ADR-0017 Punkt 4). */
 export type LoadIntakeResult =
-  | { success: true; days: IntakeDay[] }
-  | { success: false; message: string };
-
-export type SaveWeightLogResult = { success: true } | { success: false; message: string };
-export type DeleteWeightLogResult = { success: true } | { success: false; message: string };
+  { success: true; days: IntakeDay[] } | { success: false; message: string };
 
 interface RawGoalRow {
   kcal: number;
@@ -31,12 +21,6 @@ interface RawGoalRow {
   carbs_g: number;
   fat_g: number;
   target_weight_kg: number | null;
-}
-
-interface RawWeightLogRow {
-  id: string;
-  date: string;
-  weight_kg: number;
 }
 
 interface RawIntakeFood {
@@ -51,12 +35,12 @@ interface RawIntakeEntry {
 }
 
 /**
- * Datenzugriff der Ziele-Ansicht sowie des Gewichtslogs/Kalorienziel-
- * Vorschlags (ADR-0007, ADR-0017, ADR-0018). Einziger Schreibweg auf
- * `goals` und einziger Tabellenzugriff auf `weight_logs`
- * (code-conventions.md „Gewichtslog und Kalorienziel-Vorschlag" — bewusst
- * **keine** zweite Servicedatei). Kein `user_id`-Filter im Client — RLS
- * grenzt auf die eigene Zeile/eigenen Datensätze ein.
+ * Datenzugriff der Ziele-Ansicht sowie der Ist-Zufuhr für den
+ * Kalorienziel-Vorschlag (ADR-0007, ADR-0017, ADR-0018). Einziger
+ * Schreibweg auf `goals`. Der Tabellenzugriff auf `weight_logs` liegt seit
+ * ADR-0019 in `core/weight-logs.service.ts` (zweiter Nutzer `diary`). Kein
+ * `user_id`-Filter im Client — RLS grenzt auf die eigene Zeile/eigenen
+ * Datensätze ein.
  */
 @Injectable({ providedIn: 'root' })
 export class GoalsService {
@@ -117,71 +101,6 @@ export class GoalsService {
 
     if (response.error) {
       return { success: false, message: 'Ziel konnte nicht gespeichert werden.' };
-    }
-
-    return { success: true };
-  }
-
-  /**
-   * Lädt die Gewichtsmessungen im angegebenen Kalendertag-Bereich
-   * (`gte`/`lte` auf `date`), absteigend nach Datum ohne Belang — die
-   * Sortierung übernimmt `weight.calculations.ts`.
-   */
-  async loadWeightLogs(startKey: string, endKey: string): Promise<LoadWeightLogsResult> {
-    const response = await this.supabase.client
-      .from('weight_logs')
-      .select('id, date, weight_kg')
-      .gte('date', startKey)
-      .lte('date', endKey);
-
-    if (response.error) {
-      return { success: false, message: 'Gewichtseinträge konnten nicht geladen werden.' };
-    }
-
-    const rows = (response.data ?? []) as RawWeightLogRow[];
-    const logs: WeightLogEntry[] = rows.map((row) => ({
-      id: row.id,
-      dateKey: row.date,
-      weightKg: row.weight_kg,
-    }));
-
-    return { success: true, logs };
-  }
-
-  /**
-   * Schreibt/ersetzt die Gewichtsmessung des angegebenen Tages
-   * (`unique (user_id, date)`, ADR-0017 Punkt 2). Der Bestätigungsdialog vor
-   * dem Ersetzen ist reine UI (`weight-entry-sheet`) — hier wird immer
-   * unbedingt upserted, die Datenbank garantiert nur die Eindeutigkeit.
-   */
-  async upsertWeightLog(dateKey: string, weightKg: number): Promise<SaveWeightLogResult> {
-    const userId = this.supabase.userId();
-    if (!userId) {
-      return { success: false, message: 'Nicht angemeldet.' };
-    }
-
-    const response = await this.supabase.client.from('weight_logs').upsert(
-      {
-        user_id: userId,
-        date: dateKey,
-        weight_kg: weightKg,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'user_id,date' },
-    );
-
-    if (response.error) {
-      return { success: false, message: 'Gewicht konnte nicht gespeichert werden.' };
-    }
-
-    return { success: true };
-  }
-
-  async deleteWeightLog(id: string): Promise<DeleteWeightLogResult> {
-    const response = await this.supabase.client.from('weight_logs').delete().eq('id', id);
-
-    if (response.error) {
-      return { success: false, message: 'Gewichtseintrag konnte nicht gelöscht werden.' };
     }
 
     return { success: true };
