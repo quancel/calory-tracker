@@ -25,3 +25,11 @@ den JSON-Dateien daneben.
 | 2026-09-23T06:53:57Z | — | _Nutzer-Eingabe_ | — | — | — | `prompts.md` (ok passt. ich denke die liste der zutaten könnte etwas lang ) |
 | 2026-09-23T07:10:30Z | — | _Nutzer-Eingabe_ | — | — | — | `prompts.md` (ja, committe und push alles) |
 | 2026-09-23T07:11:09Z | — | _Nutzer-Eingabe_ | — | — | — | `prompts.md` (kannst du eine github action einbauen, die bei push auf main) |
+| 2026-09-23T07:13:40Z | — | _Nutzer-Eingabe_ | — | — | — | `prompts.md` (kannst du das machen?) |
+| 2026-09-23T07:14:41Z | — | _Nutzer-Eingabe_ | — | — | — | `prompts.md` (<task-notification>) |
+| 2026-09-23T07:28:07Z | — | _Nutzer-Eingabe_ | — | — | — | `prompts.md` (<task-notification>) |
+| 2026-09-23T07:30:36Z | — | _Nutzer-Eingabe_ | — | — | — | `prompts.md` (führe ein security audit mit der app) |
+| 2026-09-23T07:30:59Z | 003 | `web-security-expert` | — | — | — | — | `003-web-security-expert.json` |
+| 2026-09-23T07:32:52Z | — | _Nutzer-Eingabe_ | — | — | — | `prompts.md` (<agent-message from="a4125b536e4932abe">) |
+| 2026-09-23T07:33:00Z | — | _Nutzer-Eingabe_ | — | — | — | `prompts.md` (<task-notification>) |
+| 2026-09-23T07:33:38Z | — | _Nutzer-Eingabe_ | — | — | — | `prompts.md` (beide umsetzen) |
