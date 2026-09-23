@@ -1,0 +1,61 @@
+<div
+  class="calorie-ring"
+  role="img"
+  [attr.aria-label]="
+    progress().hasGoal
+      ? actualRounded() +
+        ' von ' +
+        progress().goal +
+        ' kcal' +
+        (progress().isWarning ? ', ' + overshootRounded() + ' kcal über Ziel' : '')
+      : actualRounded() + ' kcal, kein Ziel gesetzt'
+  "
+>
+  <svg viewBox="0 0 120 120" width="200" height="200" aria-hidden="true">
+    <circle cx="60" cy="60" r="52" fill="none" stroke="var(--color-border)" stroke-width="8" />
+
+    @if (progress().hasGoal) {
+      <circle
+        cx="60"
+        cy="60"
+        r="52"
+        fill="none"
+        [attr.stroke]="'var(--color-accent)'"
+        stroke-width="8"
+        stroke-linecap="round"
+        [attr.stroke-dasharray]="fillDasharray()"
+        transform="rotate(-90 60 60)"
+        class="fill-arc"
+      />
+
+      @if (hasOvershoot()) {
+        <circle
+          cx="60"
+          cy="60"
+          r="52"
+          fill="none"
+          [attr.stroke]="progress().isWarning ? 'var(--color-warning)' : 'var(--color-accent)'"
+          stroke-width="8"
+          stroke-linecap="round"
+          [attr.stroke-dasharray]="overshootDasharray()"
+          transform="rotate(-90 60 60)"
+          class="overshoot-arc"
+        />
+      }
+    }
+  </svg>
+
+  <div class="ring-center">
+    <span class="kcal-value tnum" [class.warning]="progress().isWarning">{{
+      actualRounded()
+    }}</span>
+    @if (progress().hasGoal) {
+      <span class="kcal-unit">kcal</span>
+      @if (progress().isWarning) {
+        <span class="overshoot-text">+{{ overshootRounded() }} kcal über Ziel</span>
+      }
+    } @else {
+      <span class="kcal-unit muted">Kein Ziel gesetzt</span>
+    }
+  </div>
+</div>

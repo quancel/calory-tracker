@@ -1,0 +1,52 @@
+.calorie-ring {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fill-arc,
+.overshoot-arc {
+  transition: stroke-dasharray var(--duration-ring) var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fill-arc,
+  .overshoot-arc {
+    transition: none;
+  }
+}
+
+.ring-center {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-1);
+}
+
+.kcal-value {
+  font-size: var(--font-size-4xl);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-heading);
+  color: var(--color-text);
+}
+
+.kcal-value.warning {
+  color: var(--color-warning);
+}
+
+.kcal-unit {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.kcal-unit.muted {
+  color: var(--color-text-muted);
+}
+
+.overshoot-text {
+  font-size: var(--font-size-sm);
+  color: var(--color-warning);
+}

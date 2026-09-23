@@ -1,0 +1,22 @@
+<div class="segment-tabs" role="tablist" aria-label="Zeitraum">
+  <button
+    type="button"
+    role="tab"
+    class="segment-tab"
+    [class.segment-tab-active]="kind() === 'week'"
+    [attr.aria-selected]="kind() === 'week'"
+    (click)="onSelect('week')"
+  >
+    Woche
+  </button>
+  <button
+    type="button"
+    role="tab"
+    class="segment-tab"
+    [class.segment-tab-active]="kind() === 'month'"
+    [attr.aria-selected]="kind() === 'month'"
+    (click)="onSelect('month')"
+  >
+    Monat
+  </button>
+</div>

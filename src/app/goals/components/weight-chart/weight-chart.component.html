@@ -1,0 +1,67 @@
+<div class="weight-chart">
+  <div class="chart-plot">
+    <svg class="chart-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+      @for (segment of segments(); track segment.fromIndex) {
+        <line
+          [attr.x1]="segmentLine(segment).x1"
+          [attr.y1]="segmentLine(segment).y1"
+          [attr.x2]="segmentLine(segment).x2"
+          [attr.y2]="segmentLine(segment).y2"
+          [class.segment-gap]="segment.hasGap"
+          class="segment-line"
+          vector-effect="non-scaling-stroke"
+        />
+      }
+    </svg>
+
+    @for (point of points(); track point.id; let i = $index) {
+      <button
+        type="button"
+        class="chart-point"
+        [style.left.%]="xPercent(i)"
+        [style.top.%]="yPercent(point.weightKg)"
+        [attr.aria-label]="pointAriaLabel(point)"
+        [attr.aria-expanded]="openIndex() === i"
+        (click)="onPointClick(i)"
+      ></button>
+
+      @if (openIndex() === i) {
+        <div class="tooltip" [style.left.%]="xPercent(i)" [style.top.%]="yPercent(point.weightKg)">
+          <span class="tooltip-arrow"></span>
+          <p class="tooltip-date">{{ dateLabelText(point.dateKey) }}</p>
+          <p class="tooltip-weight tnum">{{ point.weightKg | number: '1.1-1' }} kg</p>
+        </div>
+      }
+    }
+  </div>
+
+  <div class="chart-axis" aria-hidden="true">
+    @for (point of points(); track point.id; let i = $index) {
+      @if (showAxisLabel(i)) {
+        <span class="axis-label" [style.left.%]="xPercent(i)">{{
+          axisLabelText(point.dateKey)
+        }}</span>
+      }
+    }
+  </div>
+
+  <table class="sr-only">
+    <caption>
+      Gewichtsverlauf der letzten 90 Tage
+    </caption>
+    <thead>
+      <tr>
+        <th scope="col">Datum</th>
+        <th scope="col">Gewicht</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (point of points(); track point.id) {
+        <tr>
+          <th scope="row">{{ dateLabelText(point.dateKey) }}</th>
+          <td>{{ point.weightKg | number: '1.1-1' }} kg</td>
+        </tr>
+      }
+    </tbody>
+  </table>
+</div>

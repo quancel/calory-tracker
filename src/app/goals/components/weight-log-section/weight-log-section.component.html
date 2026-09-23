@@ -1,0 +1,67 @@
+@if (store.loading()) {
+  <div class="state-loading" aria-busy="true" aria-live="polite">
+    <div class="skeleton skeleton-chart"></div>
+  </div>
+} @else if (store.loadError(); as message) {
+  <div class="state-error" role="alert">
+    <p class="error-text">{{ message }}</p>
+    <button type="button" class="retry-button" (click)="store.retry()">Erneut versuchen</button>
+  </div>
+} @else if (!store.hasEntries()) {
+  <div class="state-empty">
+    <p class="empty-text">Noch keine Gewichtseinträge</p>
+    <button
+      type="button"
+      class="entry-button"
+      (click)="store.openSheet()"
+      aria-label="Gewicht erfassen"
+    >
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+        <path
+          d="M12 5v14M5 12h14"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+        />
+      </svg>
+    </button>
+  </div>
+} @else {
+  <div class="entry-row">
+    <button
+      type="button"
+      class="entry-button"
+      (click)="store.openSheet()"
+      aria-label="Gewicht erfassen"
+    >
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+        <path
+          d="M12 5v14M5 12h14"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+        />
+      </svg>
+    </button>
+  </div>
+
+  <app-weight-chart
+    [points]="store.chartPoints()"
+    [segments]="store.chartSegments()"
+    [yDomain]="store.chartYDomain()"
+  />
+
+  @if (store.visibleSuggestion(); as suggestion) {
+    <app-weight-suggestion-card
+      [result]="suggestion"
+      (adopt)="store.adoptSuggestion()"
+      (dismiss)="store.dismissSuggestion()"
+    />
+  }
+}
+
+@if (store.sheetOpen()) {
+  <app-weight-entry-sheet />
+}

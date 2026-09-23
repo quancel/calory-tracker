@@ -1,0 +1,25 @@
+<div class="scanner-viewport">
+  <video #video class="scanner-video" autoplay playsinline muted></video>
+
+  @if (showTargetFrame()) {
+    <div class="target-frame" [class.target-frame-pulse]="pulse()" aria-hidden="true"></div>
+
+    @if (store.scanReentry()) {
+      <p class="context-hint">Wird hinzugefügt zu: {{ mealTypeLabels[store.mealType()] }}</p>
+    }
+
+    @if (store.scanPhase() === 'looking-up') {
+      <p class="status-text" role="status" aria-live="polite">Suche…</p>
+    }
+  }
+
+  @if (showErrorPanel()) {
+    <div class="scan-error-panel" role="alert">
+      <p class="scan-error-text">{{ errorText() }}</p>
+      <button type="button" class="primary-button" (click)="onManualCreate()">
+        Manuell anlegen
+      </button>
+      <button type="button" class="text-button" (click)="retry()">Erneut versuchen</button>
+    </div>
+  }
+</div>

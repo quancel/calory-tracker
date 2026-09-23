@@ -1,0 +1,197 @@
+.bar-chart {
+  position: relative;
+}
+
+.chart-scroll {
+  overflow-x: visible;
+}
+
+.chart-scroll-month {
+  overflow-x: auto;
+}
+
+.chart-plot {
+  position: relative;
+  padding-top: var(--space-6);
+}
+
+.goal-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed var(--color-text-muted);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.goal-line-none {
+  position: static;
+  border-top: none;
+  margin-bottom: var(--space-2);
+}
+
+.goal-label {
+  transform: translateY(-100%);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.bars {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  min-height: 160px;
+}
+
+.chart-scroll-month .bars {
+  width: max-content;
+  min-width: 100%;
+}
+
+.bar-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  flex: 1;
+  /* Jeder Balken ist ein fokussierbarer, interaktiver Datenpunkt (Tap
+     öffnet das Detail-Tooltip) — Trefferfläche mindestens 48px breit
+     (design-conventions.md „Touch-Ziele"); Höhe ist bereits über
+     .bar-track (160px) erfüllt. */
+  min-width: var(--size-touch-target-min);
+}
+
+.bar-track {
+  position: relative;
+  width: 100%;
+  height: 160px;
+  display: flex;
+  align-items: flex-end;
+}
+
+.bar {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: flex-end;
+}
+
+.bar:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.bar-entries .bar-fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--color-accent);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+
+.bar-entries .bar-warning {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: var(--color-warning);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+
+.bar-gap {
+  height: 4px !important;
+  align-self: flex-end;
+  background: var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.bar-future {
+  height: 100%;
+  background: none;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+
+.bar-day-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.tooltip {
+  position: absolute;
+  bottom: calc(100% + var(--space-2));
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 160px;
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--elevation-high);
+  padding: var(--space-3);
+  z-index: 5;
+}
+
+.tooltip-arrow {
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 10px;
+  height: 10px;
+  background: var(--color-surface);
+}
+
+.tooltip-date {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  margin: 0 0 var(--space-1);
+}
+
+.tooltip-muted {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.tooltip-kcal {
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  margin: 0 0 var(--space-2);
+}
+
+.tooltip-macros {
+  display: flex;
+  gap: var(--space-3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: var(--font-size-xs);
+}
+
+.macro-carbs {
+  color: var(--color-macro-carbs);
+}
+.macro-protein {
+  color: var(--color-macro-protein);
+}
+.macro-fat {
+  color: var(--color-macro-fat);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

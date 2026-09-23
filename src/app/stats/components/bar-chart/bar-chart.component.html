@@ -1,0 +1,130 @@
+<div class="bar-chart">
+  <div class="chart-scroll" [class.chart-scroll-month]="kind() === 'month'">
+    <div class="chart-plot">
+      @if (goalKcal() !== null) {
+        <div class="goal-line" [style.bottom.%]="goalLinePercent()">
+          <span class="goal-label">Ziel: {{ goalKcalRounded() }} kcal</span>
+        </div>
+      } @else {
+        <div class="goal-line goal-line-none">
+          <span class="goal-label">Kein Ziel gesetzt</span>
+        </div>
+      }
+
+      <div class="bars">
+        @for (item of bars(); track item.bucket.dateKey; let i = $index) {
+          <div class="bar-column" [attr.data-date-key]="item.bucket.dateKey">
+            <div class="bar-track">
+              @switch (item.bucket.state) {
+                @case ('gap') {
+                  <button
+                    type="button"
+                    class="bar bar-gap"
+                    [attr.aria-label]="ariaLabel(item)"
+                    [attr.aria-expanded]="openDateKey() === item.bucket.dateKey"
+                    (click)="onBarClick(item.bucket.dateKey)"
+                  ></button>
+                }
+                @case ('future-empty') {
+                  <button
+                    type="button"
+                    class="bar bar-future"
+                    [attr.aria-label]="ariaLabel(item)"
+                    [attr.aria-expanded]="openDateKey() === item.bucket.dateKey"
+                    (click)="onBarClick(item.bucket.dateKey)"
+                  ></button>
+                }
+                @default {
+                  <button
+                    type="button"
+                    class="bar bar-entries"
+                    [attr.aria-label]="ariaLabel(item)"
+                    [attr.aria-expanded]="openDateKey() === item.bucket.dateKey"
+                    (click)="onBarClick(item.bucket.dateKey)"
+                  >
+                    <span class="bar-fill" [style.height.%]="barFill(item).fillPercent"></span>
+                    @if (barFill(item).warningPercent > 0) {
+                      <span
+                        class="bar-warning"
+                        [style.height.%]="barFill(item).warningPercent"
+                        [style.bottom.%]="barFill(item).fillPercent"
+                      ></span>
+                    }
+                  </button>
+                }
+              }
+
+              @if (openDateKey() === item.bucket.dateKey) {
+                <div class="tooltip">
+                  <span class="tooltip-arrow"></span>
+                  <p class="tooltip-date">{{ dateLabelText(item.bucket.dateKey) }}</p>
+                  @switch (item.bucket.state) {
+                    @case ('gap') {
+                      <p class="tooltip-muted">Keine Einträge</p>
+                    }
+                    @case ('future-empty') {
+                      <p class="tooltip-muted">Noch nicht vergangen</p>
+                    }
+                    @default {
+                      <p class="tooltip-kcal">
+                        @if (item.progress.hasGoal) {
+                          {{ item.bucket.kcal | number: '1.0-0' }} von
+                          {{ item.progress.goal | number: '1.0-0' }} kcal
+                        } @else {
+                          {{ item.bucket.kcal | number: '1.0-0' }} kcal
+                        }
+                      </p>
+                      <ul class="tooltip-macros">
+                        <li class="macro-carbs">{{ item.bucket.carbsG | number: '1.0-0' }}g</li>
+                        <li class="macro-protein">{{ item.bucket.proteinG | number: '1.0-0' }}g</li>
+                        <li class="macro-fat">{{ item.bucket.fatG | number: '1.0-0' }}g</li>
+                      </ul>
+                    }
+                  }
+                </div>
+              }
+            </div>
+
+            @if (showDayLabel(i)) {
+              <span class="bar-day-label">{{ dayLabel(item.bucket.dateKey) }}</span>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+
+  <table class="sr-only">
+    <caption>Tageswerte der sichtbaren Periode</caption>
+    <thead>
+      <tr>
+        <th scope="col">Datum</th>
+        <th scope="col">kcal</th>
+        <th scope="col">Kohlenhydrate</th>
+        <th scope="col">Protein</th>
+        <th scope="col">Fett</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (item of bars(); track item.bucket.dateKey) {
+        <tr>
+          <th scope="row">{{ dateLabelText(item.bucket.dateKey) }}</th>
+          @switch (item.bucket.state) {
+            @case ('gap') {
+              <td colspan="4">Keine Einträge</td>
+            }
+            @case ('future-empty') {
+              <td colspan="4">Noch nicht vergangen</td>
+            }
+            @default {
+              <td>{{ item.bucket.kcal | number: '1.0-0' }}</td>
+              <td>{{ item.bucket.carbsG | number: '1.0-0' }}</td>
+              <td>{{ item.bucket.proteinG | number: '1.0-0' }}</td>
+              <td>{{ item.bucket.fatG | number: '1.0-0' }}</td>
+            }
+          }
+        </tr>
+      }
+    </tbody>
+  </table>
+</div>

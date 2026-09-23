@@ -1,0 +1,13 @@
+@if (isNoTarget()) {
+  <p class="hint-text">Setze ein Zielgewicht, um einen Vorschlag zu erhalten.</p>
+} @else if (isInsufficient()) {
+  <p class="hint-text">Noch zu wenig Gewichtseinträge für einen Vorschlag.</p>
+} @else if (suggestion(); as suggestion) {
+  <div class="suggestion-card" [class.suggestion-card-closing]="closing()">
+    <p class="suggestion-text">{{ cardText() }}</p>
+    <div class="suggestion-actions">
+      <button type="button" class="adopt-button" (click)="onAdopt()">Übernehmen</button>
+      <button type="button" class="dismiss-button" (click)="onDismiss()">Verwerfen</button>
+    </div>
+  </div>
+}

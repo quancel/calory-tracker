@@ -1,0 +1,26 @@
+<div class="backdrop" (click)="onBackdropClick()" aria-hidden="true"></div>
+
+<div
+  class="dialog-panel"
+  #dialogPanel
+  role="alertdialog"
+  aria-modal="true"
+  aria-labelledby="confirm-dialog-title"
+  [attr.aria-describedby]="description() ? 'confirm-dialog-description' : null"
+  (keydown)="onPanelKeydown($event)"
+>
+  <h2 id="confirm-dialog-title" class="dialog-title">{{ title() }}</h2>
+
+  @if (description(); as text) {
+    <p id="confirm-dialog-description" class="dialog-description">{{ text }}</p>
+  }
+
+  <div class="dialog-actions">
+    <button #cancelButton type="button" class="cancel-button" (click)="onCancel()">
+      {{ cancelLabel() }}
+    </button>
+    <button type="button" class="confirm-button" (click)="onConfirm()">
+      {{ confirmLabel() }}
+    </button>
+  </div>
+</div>

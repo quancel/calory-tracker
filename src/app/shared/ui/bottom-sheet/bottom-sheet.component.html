@@ -1,0 +1,33 @@
+<div class="backdrop" (click)="onClose()" aria-hidden="true"></div>
+
+<div
+  class="sheet-panel"
+  [class.sheet-panel-fullscreen]="fullscreen()"
+  #sheetPanel
+  role="dialog"
+  aria-modal="true"
+  [attr.aria-labelledby]="ariaLabelledby()"
+  (keydown)="onPanelKeydown($event)"
+>
+  <div class="drag-handle" aria-hidden="true"></div>
+
+  <button
+    type="button"
+    class="close-button"
+    [class.close-button-on-dark]="closeButtonOnDark()"
+    (click)="onClose()"
+    aria-label="Schließen"
+  >
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+      <path
+        d="M6 6l12 12M18 6L6 18"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+      />
+    </svg>
+  </button>
+
+  <ng-content />
+</div>

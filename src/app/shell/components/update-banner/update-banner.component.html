@@ -1,0 +1,9 @@
+@if (appUpdate.updateAvailable()) {
+  <div class="update-banner" role="status">
+    <span class="update-text">Neue Version verfügbar</span>
+    <div class="update-actions">
+      <button type="button" class="later-button" (click)="onDismiss()">Später</button>
+      <button type="button" class="reload-button" (click)="onReload()">Neu laden</button>
+    </div>
+  </div>
+}

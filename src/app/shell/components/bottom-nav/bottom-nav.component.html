@@ -1,0 +1,50 @@
+<nav class="bottom-nav" aria-label="Hauptnavigation">
+  <a
+    routerLink="/tagebuch"
+    routerLinkActive="active"
+    [routerLinkActiveOptions]="{ exact: true }"
+    ariaCurrentWhenActive="page"
+    class="nav-tab"
+  >
+    <svg class="nav-icon" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+      <path d="M2 6h4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+      <path d="M2 10h4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+      <path d="M2 14h4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+      <path d="M2 18h4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+      <rect
+        width="16"
+        height="20"
+        x="4"
+        y="2"
+        rx="2"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.5"
+      />
+      <path d="M9.5 8h5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+      <path d="M9.5 12H16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+      <path d="M9.5 16H14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+    </svg>
+    <span class="nav-label">Tagebuch</span>
+  </a>
+
+  <a
+    routerLink="/verlauf"
+    routerLinkActive="active"
+    [routerLinkActiveOptions]="{ exact: true }"
+    ariaCurrentWhenActive="page"
+    class="nav-tab"
+  >
+    <svg class="nav-icon" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+      <path
+        d="M18 20V10M12 20V4M6 20v-6"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+    </svg>
+    <span class="nav-label">Verlauf</span>
+  </a>
+</nav>

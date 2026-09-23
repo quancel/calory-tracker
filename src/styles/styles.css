@@ -1,0 +1,56 @@
+/**
+ * Globale Basis/Reset. Importiert die Design-Tokens als einzige
+ * Token-Quelle (siehe tokens.css, code-conventions.md).
+ */
+@import './tokens.css';
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin: 0;
+  line-height: var(--line-height-heading);
+  font-weight: var(--font-weight-semibold);
+}
+
+p {
+  margin: 0;
+}
+
+/* Sichtbarer Fokus ist nicht verhandelbar (Barrierefreiheit,
+   design-concept.md). Kein Entfernen des Fokusrings ohne Ersatz. */
+:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

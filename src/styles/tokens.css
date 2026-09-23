@@ -1,0 +1,149 @@
+/**
+ * Design-Tokens — EINZIGE Token-Quelle des Projekts.
+ *
+ * Angelegt in Paket PO-2026-09-20-001, danach von Folgepaketen nur
+ * ERWEITERT, nie neu angelegt und nie durch eine zweite Token-Datei
+ * ergänzt (siehe .claude/context/code-conventions.md).
+ *
+ * Quelle der Werte: .claude/context/design-conventions.md, Abschnitt
+ * "Token-Architektur". Zwei Ebenen:
+ *   1. Skala-Tokens (primitiv) — NICHT direkt in Komponenten verwenden.
+ *   2. Rollen-Tokens — einzige Referenz für Komponenten-CSS.
+ *
+ * Light-Mode-only (siehe design-concept.md, Abschnitt "Theming"):
+ * kein @media (prefers-color-scheme), kein zweiter Token-Satz. Ein
+ * späterer Dark Mode ergänzt einen zweiten Rollen-Block, ohne diese
+ * Datei umzubauen.
+ */
+
+:root {
+  /* ---------------------------------------------------------------- *
+   * Skala-Tokens (primitiv)
+   * ---------------------------------------------------------------- */
+
+  /* Neutral-Skala */
+  --color-neutral-0: #ffffff;
+  --color-neutral-50: #f7f8f8;
+  --color-neutral-100: #eff1f0;
+  --color-neutral-200: #e2e5e4;
+  --color-neutral-300: #cbd0ce;
+  --color-neutral-400: #a9b0ad;
+  --color-neutral-500: #828b87;
+  --color-neutral-600: #5f6764;
+  --color-neutral-700: #454b49;
+  --color-neutral-800: #2c302f;
+  --color-neutral-900: #1a1c1b;
+
+  /* Spacing-Skala (Basiseinheit 4px) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* Radius-Skala */
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 24px; /* nur top-left/top-right bei Bottom-Sheets */
+  --radius-full: 999px;
+
+  /* Typo-Skala */
+  --font-size-xs: 12px;
+  --font-size-sm: 14px;
+  --font-size-md: 16px;
+  --font-size-lg: 20px;
+  --font-size-xl: 24px;
+  --font-size-2xl: 32px;
+  --font-size-4xl: 48px;
+  --font-weight-regular: 400;
+  --font-weight-semibold: 600;
+  --line-height-body: 1.5;
+  --line-height-heading: 1.2;
+  --font-family-base: -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  /* Motion-Skala */
+  --duration-fast: 120ms;
+  --duration-base: 180ms;
+  --duration-slow: 240ms;
+  --duration-ring: 400ms;
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+
+  /* ---------------------------------------------------------------- *
+   * Rollen-Tokens (einzige Referenz für Komponenten-CSS)
+   * ---------------------------------------------------------------- */
+
+  /* Flächen */
+  --color-surface: var(--color-neutral-0);
+  --color-surface-subtle: var(--color-neutral-50);
+  --color-surface-sunken: var(--color-neutral-100); /* z. B. Skeleton-Hintergrund */
+
+  /* Text */
+  --color-text: var(--color-neutral-900);
+  --color-text-muted: var(--color-neutral-600);
+  --color-text-disabled: var(--color-neutral-400);
+
+  /* Rahmen */
+  --color-border: var(--color-neutral-200);
+  --color-border-strong: #878f8c; /* Literal statt var(--color-neutral-300): WCAG-Kontrast 3.31:1 gegen --color-surface */
+
+  /* Akzent — gedecktes Grün-Teal, genau eine Primäraktion je Ansicht */
+  --color-accent: #2e7d6b;
+  --color-accent-subtle: #e3f0ec;
+  --color-accent-on: #ffffff; /* Textfarbe auf Accent-Flächen */
+
+  /* Semantik — je einmalig, keine eigene Skala */
+  --color-success: #4f9153;
+  --color-warning: #c1631b;
+  --color-danger: #b23b3b;
+
+  /* Makro-Datenviz-Palette — getrennt von Accent/Semantik, nie als Akzent.
+     Werte in Paket PO-2026-09-20-013a gegenüber design-conventions.md
+     angepasst (Kontrastprüfung WCAG 2.2 AA, 3:1 gegen --color-surface):
+     Vorschlagswert --color-macro-carbs (#c9a227) erreichte nur 2.42:1.
+     Alle drei Makrofarben wurden daraufhin gemeinsam um denselben Faktor
+     abgedunkelt (Farbton/Sättigung unverändert, nur Helligkeit), damit sie
+     weiterhin gleich kräftig wirken und in ihrer Farbfamilie bleiben.
+     Nachdokumentiert in design-conventions.md. */
+  --color-macro-carbs: #a58520; /* vorher #c9a227, 2.42:1 -> jetzt 3.51:1 */
+  --color-macro-protein: #4c60ab; /* vorher #6e7fbf, 3.85:1 -> jetzt 5.88:1 */
+  --color-macro-fat: #b95844; /* vorher #c97b6b, 3.22:1 -> jetzt 4.62:1 */
+
+  /* Fokus */
+  --color-focus-ring: var(--color-accent);
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+
+  /* Touch-Ziele: jedes interaktive Element hat eine Trefferfläche von
+     mindestens 48×48px, mindestens --space-2 (8px) Abstand zum nächsten
+     Ziel (siehe design-conventions.md, Abschnitt "Touch-Ziele"). */
+  --size-touch-target-min: 48px;
+
+  /* Layout-Höhen fest am unteren Bildschirmrand positionierter Elemente
+     (Bottom-Navigation, FAB, Update-Banner) — Paket PO-2026-09-20-013b,
+     ADR-0015 Punkt 3. Lösen die bisher an drei Stellen wiederholten
+     56px-Literale ab (main-layout, bottom-nav, diary-shell-FAB).
+     Stapelreihenfolge von oben nach unten: Update-Banner → FAB →
+     Bottom-Navigation, siehe design-conventions.md „Update-Hinweis-
+     Komponente" / „Bottom-Navigation". */
+  --size-bottom-nav-height: 56px;
+  --size-fab: 56px;
+
+  /* Elevation — drei zurückhaltende Stufen (siehe design-concept.md,
+     Abschnitt "Form & Tiefe": "Karten flach, FAB mittel, Sheets/Dialoge
+     hoch", Charakter "ruhig, luftig, weich"). Neutrale, weiche Schatten
+     ohne Farbstich, geringe Deckkraft. Nachdokumentiert in
+     design-conventions.md. */
+  --elevation-flat: 0 1px 2px rgba(26, 28, 27, 0.06);
+  --elevation-medium: 0 4px 12px rgba(26, 28, 27, 0.12);
+  --elevation-high: 0 12px 32px rgba(26, 28, 27, 0.16);
+}
+
+/* Utility-Klasse für Zahlwerte: tabuläre Ziffern, damit Werte nicht
+   springen (siehe design-concept.md, Abschnitt "Typografie"). */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}

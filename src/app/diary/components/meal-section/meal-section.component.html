@@ -1,0 +1,100 @@
+<section class="meal-section">
+  <header class="section-header">
+    <h2 class="section-title">{{ section().label }}</h2>
+    <span class="section-kcal tnum">{{ kcalRounded() }} kcal</span>
+    <button
+      type="button"
+      class="copy-button"
+      [disabled]="!canCopySection()"
+      [attr.aria-disabled]="!canCopySection() ? true : null"
+      (click)="onCopySection()"
+      [attr.aria-label]="section().label + ': Vortag kopieren (' + copyCount() + ' Einträge)'"
+    >
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+        <rect
+          x="8"
+          y="8"
+          width="12"
+          height="12"
+          rx="2"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+        />
+        <path
+          d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+        />
+      </svg>
+      @if (copyCount() > 0) {
+        <span class="copy-badge tnum" aria-hidden="true">{{ copyCount() }}</span>
+      }
+    </button>
+    <button
+      type="button"
+      class="add-button"
+      (click)="onAddEntry()"
+      [attr.aria-label]="section().label + ': Eintrag hinzufügen'"
+    >
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+        <path
+          d="M12 5v14M5 12h14"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+        />
+      </svg>
+    </button>
+  </header>
+
+  @if (copyFeedback(); as feedback) {
+    <app-copy-feedback
+      [view]="feedback"
+      (undoRequested)="onUndoRequested()"
+      (closed)="onFeedbackClosed()"
+    />
+  }
+
+  @if (section().entries.length === 0) {
+    <p class="empty-hint">Keine Einträge</p>
+  } @else {
+    <ul class="entry-list">
+      @for (entry of section().entries; track entry.id) {
+        <li>
+          <div class="entry-row-wrapper">
+            @if (entry.syncState !== 'synced') {
+              <app-sync-status-marker
+                [state]="entry.syncState"
+                [ariaLabelSuffix]="' – ' + entry.food.name"
+                [expanded]="openMarkerEntryId() === entry.id"
+                (toggled)="onToggleMarker(entry.id)"
+              />
+            }
+            <button type="button" class="entry-row" (click)="onOpenEntry(entry)">
+              <span class="entry-name">{{ entry.food.name }}</span>
+              <span class="entry-amount-kcal tnum">
+                {{ entry.amountG }}g · {{ entryKcalRounded(entry) }} kcal
+              </span>
+            </button>
+          </div>
+          @if (openMarkerEntryId() === entry.id) {
+            <div class="sync-explanation">
+              @if (entry.syncState === 'pending') {
+                <p>Wird synchronisiert, sobald du wieder online bist.</p>
+              } @else {
+                <p>Synchronisierung fehlgeschlagen nach mehreren Versuchen.</p>
+                <button type="button" class="sync-retry-button" (click)="onRetrySync(entry.id)">
+                  Erneut versuchen
+                </button>
+              }
+            </div>
+          }
+        </li>
+      }
+    </ul>
+  }
+</section>

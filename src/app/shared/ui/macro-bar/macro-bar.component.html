@@ -1,0 +1,50 @@
+<div
+  class="macro-bar"
+  [class.macro-carbs]="macro() === 'carbs'"
+  [class.macro-protein]="macro() === 'protein'"
+  [class.macro-fat]="macro() === 'fat'"
+>
+  <div class="row">
+    <span class="label">{{ label() }}</span>
+    <span class="value tnum" [class.warning]="progress().isWarning">
+      @if (progress().hasGoal) {
+        {{ actualRounded() }}g / {{ goalRounded() }}g
+      } @else {
+        {{ actualRounded() }}g
+      }
+    </span>
+  </div>
+
+  <div
+    class="bar-track"
+    role="img"
+    [attr.aria-label]="
+      progress().hasGoal
+        ? label() +
+          ': ' +
+          actualRounded() +
+          ' von ' +
+          goalRounded() +
+          ' g' +
+          (progress().isWarning ? ', ' + overshootRounded() + ' g über Ziel' : '')
+        : label() + ': ' + actualRounded() + ' g, kein Ziel gesetzt'
+    "
+  >
+    @if (progress().hasGoal) {
+      <div class="bar-fill" [style.width.%]="fillPercent()"></div>
+      @if (hasOvershoot()) {
+        <div
+          class="bar-overshoot"
+          [class.warning]="progress().isWarning"
+          [style.width.%]="overshootPercent()"
+        ></div>
+      }
+    }
+  </div>
+
+  @if (!progress().hasGoal) {
+    <span class="no-goal-hint">— kein Ziel</span>
+  } @else if (progress().isWarning) {
+    <span class="overshoot-text">+{{ overshootRounded() }} g über Ziel</span>
+  }
+</div>

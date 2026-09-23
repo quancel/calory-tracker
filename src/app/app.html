@@ -1,0 +1,26 @@
+@if (booting()) {
+  <div class="boot-screen" role="status" aria-label="Wird geladen">
+    <svg
+      class="boot-icon"
+      viewBox="0 0 96 96"
+      width="64"
+      height="64"
+      aria-hidden="true"
+    >
+      <circle
+        cx="48"
+        cy="48"
+        r="32"
+        fill="none"
+        stroke="var(--color-accent)"
+        stroke-width="12"
+        stroke-linecap="round"
+        stroke-dasharray="167.55 33.51"
+        transform="rotate(-105 48 48)"
+      />
+    </svg>
+  </div>
+}
+
+<router-outlet />
+<router-outlet name="sheet" />

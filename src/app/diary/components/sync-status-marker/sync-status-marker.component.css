@@ -1,0 +1,33 @@
+:host {
+  display: contents;
+}
+
+.sync-marker-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 4px;
+  margin: -4px 0 -4px -4px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  animation: sync-marker-fade-in var(--duration-base) var(--ease-out);
+}
+
+.sync-marker-button:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+@keyframes sync-marker-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

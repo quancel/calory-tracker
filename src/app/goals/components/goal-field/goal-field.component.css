@@ -1,0 +1,104 @@
+.goal-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.field-label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+
+.field-row {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-2);
+}
+
+.field-input {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--size-touch-target-min);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+  text-align: right;
+}
+
+.field-input:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.field-input[aria-invalid='true'] {
+  border-color: var(--color-danger);
+}
+
+.save-button {
+  flex: none;
+  min-width: 96px;
+  min-height: var(--size-touch-target-min);
+  padding: 0 var(--space-4);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
+  color: var(--color-accent-on);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+.save-button:disabled {
+  background: var(--color-neutral-200);
+  color: var(--color-text-disabled);
+  cursor: default;
+}
+
+.save-button:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.field-feedback {
+  min-height: var(--font-size-xs);
+}
+
+.field-error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--font-size-xs);
+}
+
+.field-success {
+  margin: 0;
+  color: var(--color-success);
+  font-size: var(--font-size-xs);
+}
+
+/* Erfolgs-/Fehlermeldung blendet ein (design-conventions.md „Feldblock mit
+   unabhängigem Speichern"); das Ausblenden nach ca. 2400ms passiert über den
+   Zustandswechsel im Store (GoalsStore), nicht über eine CSS-Animation. */
+.field-error,
+.field-success {
+  animation: goal-field-feedback-in var(--duration-base) var(--ease-out);
+}
+
+@keyframes goal-field-feedback-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .field-error,
+  .field-success {
+    animation: none;
+  }
+}

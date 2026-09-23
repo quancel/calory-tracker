@@ -1,0 +1,225 @@
+<app-bottom-sheet ariaLabelledby="meal-sheet-title" (close)="close()">
+  @if (step() === 'm1') {
+    <h2 id="meal-sheet-title" class="sheet-title">
+      {{ store.isEditingMeal() ? 'Mahlzeit bearbeiten' : 'Mahlzeit anlegen' }}
+    </h2>
+
+    <form class="m1-form" (submit)="onSaveMeal($event)">
+      <div class="form-field">
+        <label for="meal-name">Name</label>
+        <input
+          #nameInput
+          id="meal-name"
+          type="text"
+          autocomplete="off"
+          [value]="store.draftName()"
+          [attr.aria-invalid]="nameError() ? true : null"
+          (input)="onNameInput($event)"
+          (blur)="onNameBlur()"
+        />
+        @if (nameError(); as message) {
+          <p class="field-error">{{ message }}</p>
+        }
+      </div>
+
+      @if (store.draftItems().length === 0) {
+        <p class="items-empty-hint">Noch keine Positionen hinzugefügt.</p>
+      } @else {
+        <ul class="item-list">
+          @for (item of store.draftItems(); track item.foodId + '-' + $index) {
+            <li class="item-row">
+              <svg
+                class="chevron"
+                viewBox="0 0 24 24"
+                width="16"
+                height="16"
+                aria-hidden="true"
+              >
+                <path
+                  d="M9 6l6 6-6 6"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+              <button
+                type="button"
+                class="item-row-body"
+                (click)="onItemRowClick($index)"
+                [attr.aria-label]="item.foodName + ' – Menge ändern'"
+              >
+                <span class="item-name">{{ item.foodName }}</span>
+                <span class="item-meta tnum">
+                  {{ item.amountG }} g ·
+                  {{ (item.kcal100g * item.amountG) / 100 | number: '1.0-0' }} kcal
+                </span>
+              </button>
+              <button
+                type="button"
+                class="remove-button"
+                (click)="onRemoveItem($index, $event)"
+                [attr.aria-label]="item.foodName + ' entfernen'"
+              >
+                <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                  <path
+                    d="M6 6l12 12M18 6L6 18"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                  />
+                </svg>
+              </button>
+            </li>
+          }
+        </ul>
+      }
+
+      <button type="button" class="secondary-button" (click)="goToAddItem()">
+        Food hinzufügen
+      </button>
+
+      @if (store.draftSaveError(); as message) {
+        <p class="field-error save-error" role="alert">{{ message }}</p>
+      }
+
+      @if (store.isEditingMeal()) {
+        <button type="button" class="danger-text-button" (click)="onRequestDelete()">
+          Mahlzeit löschen
+        </button>
+      }
+
+      <button type="submit" class="primary-button save-button" [disabled]="!store.canSaveMeal()">
+        Speichern
+      </button>
+    </form>
+  } @else if (step() === 'm2') {
+    <button type="button" class="back-button" (click)="backToM1()" aria-label="Zurück">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+        <path
+          d="M15 6l-6 6 6 6"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+      Zurück
+    </button>
+
+    <h2 id="meal-sheet-title" class="sheet-title">Food auswählen</h2>
+
+    <input
+      #m2SearchInput
+      type="search"
+      class="search-input"
+      autocomplete="off"
+      placeholder="Food suchen"
+      aria-label="Food suchen"
+      [value]="store.m2Query()"
+      (input)="onM2QueryInput($event)"
+    />
+
+    @if (store.foodsLoading()) {
+      <div class="state-loading" aria-busy="true" aria-live="polite">
+        <div class="skeleton-row"></div>
+        <div class="skeleton-row"></div>
+      </div>
+    } @else if (store.foodsLoadError(); as message) {
+      <div class="state-error" role="alert">
+        <p class="error-text">{{ message }}</p>
+        <button type="button" class="retry-button" (click)="store.retryFoodsLoad()">
+          Erneut versuchen
+        </button>
+      </div>
+    } @else if (store.m2Results().length === 0) {
+      <p class="empty-text">Kein Treffer für „{{ store.m2Query().trim() }}"</p>
+    } @else {
+      <ul class="result-list">
+        @for (food of store.m2Results(); track food.id) {
+          <li class="result-item">
+            <span class="marker-slot">
+              <app-plausibility-marker [marker]="m3Marker(food)" />
+            </span>
+            <button type="button" class="result-row" (click)="onSelectM2Food(food)">
+              <span class="result-name">{{ food.name }}</span>
+              <span class="result-meta tnum">{{ food.kcal100g }} kcal/100g</span>
+            </button>
+          </li>
+        }
+      </ul>
+    }
+  } @else {
+    <button type="button" class="back-button" (click)="backFromM3()" aria-label="Zurück">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+        <path
+          d="M15 6l-6 6 6 6"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+      Zurück
+    </button>
+
+    <h2 id="meal-sheet-title" class="sheet-title step-title">
+      @if (store.m3Food(); as food) {
+        <app-plausibility-marker [marker]="m3Marker(food)" />
+        <span class="step-title-text">{{ food.name }}</span>
+      }
+    </h2>
+
+    <form class="m3-form" (submit)="onConfirmAmount($event)">
+      <div class="form-field amount-field">
+        <label for="meal-item-amount">Menge</label>
+        <div class="amount-input-wrap">
+          <input
+            #m3AmountInput
+            id="meal-item-amount"
+            class="tnum"
+            type="text"
+            inputmode="decimal"
+            autocomplete="off"
+            [value]="store.m3AmountInput()"
+            [attr.aria-invalid]="m3AmountError() ? true : null"
+            (input)="onM3AmountInput($event)"
+          />
+          <span class="unit-suffix" aria-hidden="true">g</span>
+        </div>
+        @if (m3AmountError(); as message) {
+          <p class="field-error">{{ message }}</p>
+        }
+      </div>
+
+      @if (m3LiveNutrition(); as calc) {
+        <div class="live-calc">
+          <p class="live-kcal tnum">{{ calc.kcal | number: '1.0-0' }} kcal</p>
+          <div class="live-macros">
+            <span class="live-macro live-macro-carbs tnum">{{ calc.carbsG | number: '1.0-1' }} g KH</span>
+            <span class="live-macro live-macro-protein tnum">{{ calc.proteinG | number: '1.0-1' }} g Protein</span>
+            <span class="live-macro live-macro-fat tnum">{{ calc.fatG | number: '1.0-1' }} g Fett</span>
+          </div>
+        </div>
+      }
+
+      <button type="submit" class="primary-button save-button" [disabled]="!store.canConfirmAmount()">
+        {{ store.isChangeMode() ? 'Übernehmen' : 'Hinzufügen' }}
+      </button>
+    </form>
+  }
+</app-bottom-sheet>
+
+@if (confirmDeleteOpen()) {
+  <app-confirm-dialog
+    title="Gespeicherte Mahlzeit löschen?"
+    description="Bereits geloggte Einträge bleiben erhalten."
+    confirmLabel="Löschen"
+    (confirm)="onConfirmDelete()"
+    (cancel)="onCancelDelete()"
+  />
+}

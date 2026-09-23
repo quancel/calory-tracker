@@ -1,0 +1,68 @@
+<div class="meals-page">
+  <header class="meals-header">
+    <a routerLink="/tagebuch" class="back-link" aria-label="Zurück zum Tagebuch">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+        <path
+          d="M15 5l-7 7 7 7"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+    </a>
+    <h1 class="meals-title">Gespeicherte Mahlzeiten</h1>
+    <button type="button" class="add-button" (click)="openNew()" aria-label="Mahlzeit anlegen">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+        <path
+          d="M12 5v14M5 12h14"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+        />
+      </svg>
+    </button>
+  </header>
+
+  @if (store.listLoading()) {
+    <div class="state-loading" aria-busy="true" aria-live="polite">
+      <div class="skeleton-row"></div>
+      <div class="skeleton-row"></div>
+      <div class="skeleton-row"></div>
+    </div>
+  } @else if (store.listLoadError(); as message) {
+    <div class="state-error" role="alert">
+      <p class="error-text">{{ message }}</p>
+      <button type="button" class="retry-button" (click)="store.retryListLoad()">
+        Erneut versuchen
+      </button>
+    </div>
+  } @else if (store.meals().length === 0) {
+    <p class="empty-text">Noch keine gespeicherten Mahlzeiten</p>
+  } @else {
+    <ul class="meal-list">
+      @for (entry of store.meals(); track entry.meal.id) {
+        <li>
+          @if (entry.meal.items.length === 0) {
+            <div class="meal-row meal-row-disabled" aria-disabled="true">
+              <div class="meal-row-main">
+                <span class="meal-name">{{ entry.meal.name }}</span>
+              </div>
+              <p class="meal-preview">Keine Positionen</p>
+            </div>
+          } @else {
+            <button type="button" class="meal-row" (click)="openMeal(entry.meal.id)">
+              <div class="meal-row-main">
+                <span class="meal-name">{{ entry.meal.name }}</span>
+                <span class="meal-kcal tnum">{{ entry.totals.kcal | number: '1.0-0' }} kcal</span>
+              </div>
+              <p class="meal-preview">{{ itemsPreview(entry.meal.items) }}</p>
+            </button>
+          }
+        </li>
+      }
+    </ul>
+  }
+</div>

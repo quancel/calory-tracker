@@ -1,0 +1,634 @@
+<app-bottom-sheet
+  ariaLabelledby="food-entry-sheet-title"
+  [fullscreen]="step() === 'scan'"
+  [closeButtonOnDark]="step() === 'scan'"
+  (close)="close()"
+>
+  @if (step() === 'search') {
+    <h2 id="food-entry-sheet-title" class="sheet-title">Eintrag hinzufügen</h2>
+
+    <div class="meal-chip-row" role="group" aria-label="Mahlzeit auswählen">
+      @for (option of mealTypeOptions; track option) {
+        <button
+          type="button"
+          class="meal-chip"
+          [class.meal-chip-selected]="store.mealType() === option"
+          (click)="onMealTypeSelect(option)"
+        >
+          {{ mealTypeLabels[option] }}
+        </button>
+      }
+    </div>
+
+    <div class="segment-tabs" role="tablist" aria-label="Eingabemodus">
+      <button
+        type="button"
+        role="tab"
+        class="segment-tab"
+        [class.segment-tab-active]="store.activeTab() === 'search'"
+        [attr.aria-selected]="store.activeTab() === 'search'"
+        (click)="onSelectTab('search')"
+      >
+        Suchen
+      </button>
+      <button
+        type="button"
+        role="tab"
+        class="segment-tab"
+        [class.segment-tab-active]="store.activeTab() === 'saved-meals'"
+        [attr.aria-selected]="store.activeTab() === 'saved-meals'"
+        (click)="onSelectTab('saved-meals')"
+      >
+        Gespeicherte Mahlzeiten
+      </button>
+    </div>
+
+    @if (store.activeTab() === 'search') {
+      <div class="search-row">
+        <input
+          #searchInput
+          type="search"
+          class="search-input"
+          autocomplete="off"
+          placeholder="Food suchen"
+          aria-label="Food suchen"
+          [value]="store.query()"
+          (input)="onQueryInput($event)"
+        />
+        <button type="button" class="scan-button" (click)="goToScan()" aria-label="Barcode scannen">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+            <path
+              d="M4 7V4h3M20 7V4h-3M4 17v3h3M20 17v3h-3M7 6v12M11 6v12M14 6v12M17 6v12"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </button>
+      </div>
+
+      @if (store.loading()) {
+        <div class="state-loading" aria-busy="true" aria-live="polite">
+          <div class="skeleton-row"></div>
+          <div class="skeleton-row"></div>
+          <div class="skeleton-row"></div>
+        </div>
+      } @else if (store.loadError(); as message) {
+        <div class="state-error" role="alert">
+          <p class="error-text">{{ message }}</p>
+          <button type="button" class="retry-button" (click)="store.retryLoad()">
+            Erneut versuchen
+          </button>
+        </div>
+      } @else if (store.showEmptyState()) {
+        <div class="empty-state">
+          <p class="empty-text">Kein Treffer für „{{ store.query().trim() }}"</p>
+          <button type="button" class="primary-button" (click)="goToCreate()">
+            „{{ store.query().trim() }}" anlegen
+          </button>
+        </div>
+      } @else {
+        <ul class="result-list">
+          @for (food of store.results(); track food.id) {
+            <li class="result-item">
+              <span class="marker-slot">
+                <app-plausibility-marker
+                  [marker]="marker(food)"
+                  [interactive]="true"
+                  [ariaLabelSuffix]="' – ' + food.name + ' bearbeiten'"
+                  (correct)="openCorrectFromList(food)"
+                />
+              </span>
+              <button type="button" class="result-row" (click)="onSelectFood(food)">
+                <span class="result-name">
+                  @if (marker(food); as m) {
+                    <span class="sr-only">{{ markerStatusText(m) }}. </span>
+                  }
+                  {{ food.name }}
+                </span>
+                <span class="result-meta tnum">
+                  {{ food.kcal100g }} kcal/100g
+                  @if (food.defaultPortionG !== null) {
+                    · Standardportion {{ food.defaultPortionG }}g
+                  }
+                </span>
+              </button>
+            </li>
+          }
+        </ul>
+      }
+    } @else {
+      @if (store.loggedMealSummary(); as summary) {
+        <div class="scan-success" role="status" aria-live="polite">
+          <p class="scan-success-text">Gespeichert</p>
+          <p class="scan-success-summary tnum">
+            {{ summary.name }} · {{ summary.itemCount }}
+            {{ summary.itemCount === 1 ? 'Position' : 'Positionen' }}
+          </p>
+          <button type="button" class="primary-button" (click)="onLogMealNext()">
+            Weitere Mahlzeit loggen
+          </button>
+          <button type="button" class="text-button" (click)="close()">Fertig</button>
+        </div>
+      } @else if (store.savedMealsLoading()) {
+        <div class="state-loading" aria-busy="true" aria-live="polite">
+          <div class="skeleton-row"></div>
+          <div class="skeleton-row"></div>
+          <div class="skeleton-row"></div>
+        </div>
+      } @else if (store.savedMealsLoadError(); as message) {
+        <div class="state-error" role="alert">
+          <p class="error-text">{{ message }}</p>
+          <button type="button" class="retry-button" (click)="store.retrySavedMealsLoad()">
+            Erneut versuchen
+          </button>
+        </div>
+      } @else if (store.showSavedMealsEmptyState()) {
+        <div class="empty-state">
+          <p class="empty-text">Noch keine gespeicherten Mahlzeiten</p>
+          <a routerLink="/mahlzeiten" class="text-button">Verwalten</a>
+        </div>
+      } @else {
+        <ul class="result-list">
+          @for (entry of store.savedMeals(); track entry.meal.id) {
+            <li class="result-item">
+              @if (entry.meal.items.length === 0) {
+                <div class="meal-row-disabled" aria-disabled="true">
+                  <span class="result-name">{{ entry.meal.name }}</span>
+                  <span class="result-meta">Keine Positionen</span>
+                </div>
+              } @else {
+                <button
+                  type="button"
+                  class="result-row"
+                  [disabled]="store.loggingMeal()"
+                  (click)="onLogMeal(entry.meal)"
+                >
+                  <span class="result-name">{{ entry.meal.name }}</span>
+                  <span class="result-meta tnum">{{ entry.totals.kcal | number: '1.0-0' }} kcal</span>
+                </button>
+              }
+            </li>
+          }
+        </ul>
+      }
+    }
+  } @else if (step() === 'create') {
+    <button
+      type="button"
+      class="back-button"
+      (click)="backToSearch()"
+      aria-label="Zurück zur Suche"
+    >
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+        <path
+          d="M15 6l-6 6 6 6"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+      Zurück
+    </button>
+
+    <h2 id="food-entry-sheet-title" class="sheet-title">Food anlegen</h2>
+
+    <form class="create-form" (submit)="onSubmitCreate($event)">
+      <div class="form-field">
+        <label for="food-name">Name</label>
+        <input
+          #nameInput
+          id="food-name"
+          type="text"
+          autocomplete="off"
+          [value]="store.createForm().name"
+          [attr.aria-invalid]="createFieldError('name') ? true : null"
+          (input)="onCreateFieldInput('name', $event)"
+          (blur)="onCreateFieldBlur('name')"
+        />
+        @if (createFieldError('name'); as message) {
+          <p class="field-error">{{ message }}</p>
+        }
+      </div>
+
+      @if (store.createForm().barcode !== '') {
+        <p class="barcode-info">Barcode: {{ store.createForm().barcode }}</p>
+      }
+
+      <div class="form-field">
+        <label for="food-kcal">Kalorien je 100g</label>
+        <input
+          id="food-kcal"
+          class="tnum"
+          type="text"
+          inputmode="decimal"
+          autocomplete="off"
+          [value]="store.createForm().kcal100g"
+          [attr.aria-invalid]="createFieldError('kcal100g') ? true : null"
+          (input)="onCreateFieldInput('kcal100g', $event)"
+          (blur)="onCreateFieldBlur('kcal100g')"
+        />
+        @if (createFieldError('kcal100g'); as message) {
+          <p class="field-error">{{ message }}</p>
+        }
+      </div>
+
+      <div class="form-field">
+        <label for="food-protein">Protein je 100g</label>
+        <input
+          id="food-protein"
+          class="tnum"
+          type="text"
+          inputmode="decimal"
+          autocomplete="off"
+          [value]="store.createForm().proteinG100g"
+          [attr.aria-invalid]="createFieldError('proteinG100g') ? true : null"
+          (input)="onCreateFieldInput('proteinG100g', $event)"
+          (blur)="onCreateFieldBlur('proteinG100g')"
+        />
+        @if (createFieldError('proteinG100g'); as message) {
+          <p class="field-error">{{ message }}</p>
+        }
+      </div>
+
+      <div class="form-field">
+        <label for="food-carbs">Kohlenhydrate je 100g</label>
+        <input
+          id="food-carbs"
+          class="tnum"
+          type="text"
+          inputmode="decimal"
+          autocomplete="off"
+          [value]="store.createForm().carbsG100g"
+          [attr.aria-invalid]="createFieldError('carbsG100g') ? true : null"
+          (input)="onCreateFieldInput('carbsG100g', $event)"
+          (blur)="onCreateFieldBlur('carbsG100g')"
+        />
+        @if (createFieldError('carbsG100g'); as message) {
+          <p class="field-error">{{ message }}</p>
+        }
+      </div>
+
+      <div class="form-field">
+        <label for="food-fat">Fett je 100g</label>
+        <input
+          id="food-fat"
+          class="tnum"
+          type="text"
+          inputmode="decimal"
+          autocomplete="off"
+          [value]="store.createForm().fatG100g"
+          [attr.aria-invalid]="createFieldError('fatG100g') ? true : null"
+          (input)="onCreateFieldInput('fatG100g', $event)"
+          (blur)="onCreateFieldBlur('fatG100g')"
+        />
+        @if (createFieldError('fatG100g'); as message) {
+          <p class="field-error">{{ message }}</p>
+        }
+      </div>
+
+      <div class="form-field">
+        <label for="food-portion">Standardportion (g, optional)</label>
+        <input
+          id="food-portion"
+          class="tnum"
+          type="text"
+          inputmode="decimal"
+          autocomplete="off"
+          placeholder="100"
+          [value]="store.createForm().defaultPortionG"
+          [attr.aria-invalid]="createFieldError('defaultPortionG') ? true : null"
+          (input)="onCreateFieldInput('defaultPortionG', $event)"
+          (blur)="onCreateFieldBlur('defaultPortionG')"
+        />
+        @if (createFieldError('defaultPortionG'); as message) {
+          <p class="field-error">{{ message }}</p>
+        }
+      </div>
+
+      @if (store.createErrorMessage(); as message) {
+        <p class="field-error create-error" role="alert">{{ message }}</p>
+      }
+
+      <button type="submit" class="primary-button" [disabled]="!store.canCreate()">Anlegen</button>
+    </form>
+  } @else if (step() === 'scan') {
+    <h2 id="food-entry-sheet-title" class="sheet-title sr-only">Barcode scannen</h2>
+    <app-barcode-scanner (manualCreate)="onScanManualCreate()" />
+  } @else if (step() === 'scan-success') {
+    <h2 id="food-entry-sheet-title" class="sheet-title sr-only">Gespeichert</h2>
+    <div class="scan-success" role="status" aria-live="polite">
+      <p class="scan-success-text">Gespeichert</p>
+      @if (store.lastSavedSummary(); as summary) {
+        <p class="scan-success-summary tnum">
+          {{ summary.name }} · {{ summary.kcal | number: '1.0-0' }} kcal
+        </p>
+      }
+      <button type="button" class="primary-button" (click)="onScanNext()">
+        Nächsten Barcode scannen
+      </button>
+      <button type="button" class="text-button" (click)="close()">Fertig</button>
+    </div>
+  } @else if (step() === 'correct') {
+    <button
+      type="button"
+      class="back-button"
+      (click)="backFromCorrect()"
+      aria-label="Zurück"
+    >
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+        <path
+          d="M15 6l-6 6 6 6"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+      Zurück
+    </button>
+
+    <h2 id="food-entry-sheet-title" class="sheet-title">Nährwerte bearbeiten</h2>
+
+    @if (store.correctFindings().length > 0) {
+      <div class="plausibility-banner" role="status">
+        @for (finding of store.correctFindings(); track finding.kind) {
+          <p
+            class="plausibility-banner-line"
+            [class.plausibility-banner-line-warning]="finding.kind !== 'incomplete'"
+          >
+            {{ finding.message }}
+          </p>
+        }
+      </div>
+    }
+
+    <form class="create-form" (submit)="onSubmitCorrect($event)">
+      <div class="form-field">
+        <label for="correct-food-name">Name</label>
+        <input
+          #correctNameInput
+          id="correct-food-name"
+          type="text"
+          autocomplete="off"
+          [value]="store.correctForm().name"
+          [attr.aria-invalid]="correctFieldError('name') ? true : null"
+          (input)="onCorrectFieldInput('name', $event)"
+          (blur)="onCorrectFieldBlur('name')"
+        />
+        @if (correctFieldError('name'); as message) {
+          <p class="field-error">{{ message }}</p>
+        }
+      </div>
+
+      @if (store.correctForm().barcode !== '') {
+        <p class="barcode-info">Barcode: {{ store.correctForm().barcode }}</p>
+      }
+
+      <div class="form-field">
+        <label for="correct-food-kcal">Kalorien je 100g</label>
+        <input
+          id="correct-food-kcal"
+          class="tnum"
+          type="text"
+          inputmode="decimal"
+          autocomplete="off"
+          [value]="store.correctForm().kcal100g"
+          [attr.aria-invalid]="correctFieldError('kcal100g') ? true : null"
+          (input)="onCorrectFieldInput('kcal100g', $event)"
+          (blur)="onCorrectFieldBlur('kcal100g')"
+        />
+        @if (correctFieldError('kcal100g'); as message) {
+          <p class="field-error">{{ message }}</p>
+        }
+      </div>
+
+      <div class="form-field">
+        <label for="correct-food-protein">Protein je 100g</label>
+        <input
+          id="correct-food-protein"
+          class="tnum"
+          type="text"
+          inputmode="decimal"
+          autocomplete="off"
+          [value]="store.correctForm().proteinG100g"
+          [attr.aria-invalid]="correctFieldError('proteinG100g') ? true : null"
+          (input)="onCorrectFieldInput('proteinG100g', $event)"
+          (blur)="onCorrectFieldBlur('proteinG100g')"
+        />
+        @if (correctFieldError('proteinG100g'); as message) {
+          <p class="field-error">{{ message }}</p>
+        }
+      </div>
+
+      <div class="form-field">
+        <label for="correct-food-carbs">Kohlenhydrate je 100g</label>
+        <input
+          id="correct-food-carbs"
+          class="tnum"
+          type="text"
+          inputmode="decimal"
+          autocomplete="off"
+          [value]="store.correctForm().carbsG100g"
+          [attr.aria-invalid]="correctFieldError('carbsG100g') ? true : null"
+          (input)="onCorrectFieldInput('carbsG100g', $event)"
+          (blur)="onCorrectFieldBlur('carbsG100g')"
+        />
+        @if (correctFieldError('carbsG100g'); as message) {
+          <p class="field-error">{{ message }}</p>
+        }
+      </div>
+
+      <div class="form-field">
+        <label for="correct-food-fat">Fett je 100g</label>
+        <input
+          id="correct-food-fat"
+          class="tnum"
+          type="text"
+          inputmode="decimal"
+          autocomplete="off"
+          [value]="store.correctForm().fatG100g"
+          [attr.aria-invalid]="correctFieldError('fatG100g') ? true : null"
+          (input)="onCorrectFieldInput('fatG100g', $event)"
+          (blur)="onCorrectFieldBlur('fatG100g')"
+        />
+        @if (correctFieldError('fatG100g'); as message) {
+          <p class="field-error">{{ message }}</p>
+        }
+      </div>
+
+      <div class="form-field">
+        <label for="correct-food-portion">Standardportion (g, optional)</label>
+        <input
+          id="correct-food-portion"
+          class="tnum"
+          type="text"
+          inputmode="decimal"
+          autocomplete="off"
+          placeholder="100"
+          [value]="store.correctForm().defaultPortionG"
+          [attr.aria-invalid]="correctFieldError('defaultPortionG') ? true : null"
+          (input)="onCorrectFieldInput('defaultPortionG', $event)"
+          (blur)="onCorrectFieldBlur('defaultPortionG')"
+        />
+        @if (correctFieldError('defaultPortionG'); as message) {
+          <p class="field-error">{{ message }}</p>
+        }
+      </div>
+
+      @if (store.correctErrorMessage(); as message) {
+        <p class="field-error create-error" role="alert">{{ message }}</p>
+      }
+
+      <button type="submit" class="primary-button" [disabled]="!store.canSubmitCorrect()">
+        Speichern
+      </button>
+    </form>
+  } @else {
+    @if (!store.isEditing()) {
+      <button
+        type="button"
+        class="back-button"
+        (click)="backToSearch()"
+        aria-label="Zurück zur Suche"
+      >
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+          <path
+            d="M15 6l-6 6 6 6"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+        Zurück
+      </button>
+    }
+
+    <h2 id="food-entry-sheet-title" class="sheet-title step-b-title">
+      @if (store.stepBFood(); as stepBFood) {
+        <app-plausibility-marker [marker]="marker(stepBFood)" />
+        <span class="step-b-title-text">{{ stepBFood.name }}</span>
+        <button
+          type="button"
+          class="edit-food-button"
+          (click)="openCorrectFromStepB()"
+          aria-label="Nährwerte bearbeiten"
+        >
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+            <path
+              d="M14.5 4.5 19.5 9.5 8 21H3v-5L14.5 4.5Z"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linejoin="round"
+              stroke-linecap="round"
+            />
+            <path d="M12.5 6.5 17.5 11.5" stroke="currentColor" stroke-width="1.6" />
+          </svg>
+        </button>
+      } @else {
+        Menge erfassen
+      }
+    </h2>
+
+    <div class="meal-chip-row" role="group" aria-label="Mahlzeit auswählen">
+      @for (option of mealTypeOptions; track option) {
+        <button
+          type="button"
+          class="meal-chip"
+          [class.meal-chip-selected]="store.mealType() === option"
+          (click)="onMealTypeSelect(option)"
+        >
+          {{ mealTypeLabels[option] }}
+        </button>
+      }
+    </div>
+
+    @if (store.stepBFood()?.source === 'off') {
+      <p class="source-hint">Aus Open Food Facts übernommen</p>
+    }
+
+    @if (store.stepBLoading()) {
+      <div class="state-loading" aria-busy="true" aria-live="polite">
+        <div class="skeleton-row"></div>
+        <div class="skeleton-row"></div>
+      </div>
+    } @else if (store.stepBLoadError(); as message) {
+      <div class="state-error" role="alert">
+        <p class="error-text">{{ message }}</p>
+        <button type="button" class="retry-button" (click)="retryLoadEntry()">
+          Erneut versuchen
+        </button>
+      </div>
+    } @else {
+      <form class="amount-form" (submit)="onSubmitAmount($event)">
+        <div class="form-field amount-field">
+          <label for="entry-amount">Menge</label>
+          <div class="amount-input-wrap">
+            <input
+              #amountInput
+              id="entry-amount"
+              class="tnum"
+              type="text"
+              inputmode="decimal"
+              autocomplete="off"
+              [value]="store.amountInput()"
+              [attr.aria-invalid]="amountFieldError() ? true : null"
+              (input)="onAmountInput($event)"
+            />
+            <span class="unit-suffix" aria-hidden="true">g</span>
+          </div>
+          @if (amountFieldError(); as message) {
+            <p class="field-error">{{ message }}</p>
+          }
+        </div>
+
+        @if (store.liveNutrition(); as calc) {
+          <div class="live-calc">
+            <p class="live-kcal tnum">{{ calc.kcal | number: '1.0-0' }} kcal</p>
+            <div class="live-macros">
+              <span class="live-macro live-macro-carbs tnum"
+                >{{ calc.carbsG | number: '1.0-1' }} g KH</span
+              >
+              <span class="live-macro live-macro-protein tnum"
+                >{{ calc.proteinG | number: '1.0-1' }} g Protein</span
+              >
+              <span class="live-macro live-macro-fat tnum"
+                >{{ calc.fatG | number: '1.0-1' }} g Fett</span
+              >
+            </div>
+          </div>
+        }
+
+        @if (store.stepBSaveError(); as message) {
+          <p class="field-error save-error" role="alert">{{ message }}</p>
+        }
+
+        @if (store.isEditing()) {
+          <button type="button" class="danger-text-button" (click)="onRequestDelete()">
+            Löschen
+          </button>
+        }
+
+        <button type="submit" class="primary-button save-button" [disabled]="!store.canSaveEntry()">
+          Speichern
+        </button>
+      </form>
+    }
+  }
+</app-bottom-sheet>
+
+@if (confirmDeleteOpen()) {
+  <app-confirm-dialog
+    title="Eintrag löschen?"
+    (confirm)="onConfirmDelete()"
+    (cancel)="onCancelDelete()"
+  />
+}

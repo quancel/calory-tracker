@@ -1,0 +1,85 @@
+.macro-bar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.macro-carbs {
+  --macro-color: var(--color-macro-carbs);
+}
+.macro-protein {
+  --macro-color: var(--color-macro-protein);
+}
+.macro-fat {
+  --macro-color: var(--color-macro-fat);
+}
+
+.row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+
+.value {
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+
+.value.warning {
+  color: var(--color-warning);
+}
+
+.bar-track {
+  position: relative;
+  width: 100%;
+  height: var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-border);
+  overflow: visible;
+}
+
+.bar-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--macro-color);
+  transition: width var(--duration-base) var(--ease-out);
+}
+
+.bar-overshoot {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--macro-color);
+  transition: width var(--duration-base) var(--ease-out);
+}
+
+.bar-overshoot.warning {
+  background: var(--color-warning);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar-fill,
+  .bar-overshoot {
+    transition: none;
+  }
+}
+
+.no-goal-hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.overshoot-text {
+  font-size: var(--font-size-xs);
+  color: var(--color-warning);
+}

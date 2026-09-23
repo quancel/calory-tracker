@@ -1,0 +1,15 @@
+.main-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.main-layout-content {
+  flex: 1;
+  min-height: 0;
+  /* Bottom-Navigation ist `position: fixed` (design-conventions.md
+     „Bottom-Navigation"), daher hier Platz reservieren statt sie zu
+     überlappen: --size-bottom-nav-height zzgl. safe-area-inset-bottom,
+     siehe bottom-nav.component.css. */
+  padding-bottom: calc(var(--size-bottom-nav-height) + env(safe-area-inset-bottom));
+}

@@ -1,0 +1,164 @@
+.meal-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.section-title {
+  flex: 1;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  margin: 0;
+}
+
+.section-kcal {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.add-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-touch-target-min);
+  height: var(--size-touch-target-min);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.add-button:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.copy-button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-touch-target-min);
+  height: var(--size-touch-target-min);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.copy-button:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.copy-button:disabled {
+  color: var(--color-text-disabled);
+  cursor: default;
+}
+
+.copy-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  color: var(--color-accent-on);
+  font-size: var(--font-size-xs);
+  line-height: 18px;
+  text-align: center;
+}
+
+.empty-hint {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.entry-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.entry-row-wrapper {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.entry-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex: 1;
+  min-width: 0;
+  min-height: var(--size-touch-target-min);
+  padding: var(--space-2) 0;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  color: var(--color-text);
+}
+
+/* Sync-Status-Marker (ADR-0016, design-conventions.md „Sync-Status-Marker"):
+   Inline-Erläuterung unterhalb der Zeile, volle Breite, schiebt
+   nachfolgende Zeilen nach unten statt sie zu verdecken. */
+.sync-explanation {
+  background: var(--color-surface-subtle);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-2);
+}
+
+.sync-explanation p {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.sync-retry-button {
+  margin-top: var(--space-2);
+  min-height: var(--size-touch-target-min);
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.sync-retry-button:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.entry-row:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.entry-name {
+  flex: 1;
+  font-size: var(--font-size-md);
+}
+
+.entry-amount-kcal {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}

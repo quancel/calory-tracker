@@ -1,0 +1,68 @@
+<div class="goals-page">
+  <header class="goals-header">
+    <a routerLink="/tagebuch" class="back-link" aria-label="Zurück zum Tagebuch">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+        <path
+          d="M15 5l-7 7 7 7"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+    </a>
+    <h1 class="goals-title">Ziele</h1>
+    <span class="header-spacer" aria-hidden="true"></span>
+  </header>
+
+  @if (goalsStore.loading()) {
+    <div class="state-loading" aria-busy="true" aria-live="polite">
+      <div class="skeleton skeleton-field"></div>
+      <div class="skeleton skeleton-field"></div>
+      <div class="skeleton skeleton-field"></div>
+      <div class="skeleton skeleton-field"></div>
+    </div>
+  } @else if (goalsStore.loadError(); as message) {
+    <div class="state-error" role="alert">
+      <p class="error-text">{{ message }}</p>
+      <button type="button" class="retry-button" (click)="goalsStore.retry()">
+        Erneut versuchen
+      </button>
+    </div>
+  } @else {
+    <div class="goal-fields">
+      @for (field of fields; track field.key) {
+        <app-goal-field
+          [label]="field.label"
+          [unit]="field.unit"
+          [value]="goalsStore.inputValue(field.key)()"
+          [validationError]="goalsStore.validationError(field.key)()"
+          [canSave]="goalsStore.canSave(field.key)()"
+          [saveState]="goalsStore.saveState(field.key)()"
+          [saveErrorMessage]="goalsStore.saveErrorMessage(field.key)()"
+          (valueChange)="goalsStore.setInput(field.key, $event)"
+          (save)="goalsStore.save(field.key)"
+        />
+      }
+    </div>
+
+    <section class="weight-log-section" aria-labelledby="weight-log-heading">
+      <h2 id="weight-log-heading" class="section-heading">Gewichtslog</h2>
+
+      <app-goal-field
+        [label]="targetWeightField.label"
+        [unit]="targetWeightField.unit"
+        [value]="goalsStore.inputValue('targetWeightKg')()"
+        [validationError]="goalsStore.validationError('targetWeightKg')()"
+        [canSave]="goalsStore.canSave('targetWeightKg')()"
+        [saveState]="goalsStore.saveState('targetWeightKg')()"
+        [saveErrorMessage]="goalsStore.saveErrorMessage('targetWeightKg')()"
+        (valueChange)="goalsStore.setInput('targetWeightKg', $event)"
+        (save)="goalsStore.save('targetWeightKg')"
+      />
+
+      <app-weight-log-section />
+    </section>
+  }
+</div>

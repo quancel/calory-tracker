@@ -1,0 +1,483 @@
+/* Sheet-Rahmen (Backdrop/Panel/Drag-Handle/Schließen-Button) liegt seit
+   Paket 010 in shared/ui/bottom-sheet/ (ADR-0012 Punkt 5) — hier nur noch
+   Step-Inhalt. */
+:host {
+  display: contents;
+}
+
+.search-input:focus-visible,
+.scan-button:focus-visible,
+.primary-button:focus-visible,
+.result-row:focus-visible,
+.back-button:focus-visible,
+.form-field input:focus-visible,
+.meal-chip:focus-visible,
+.amount-input-wrap input:focus-visible,
+.danger-text-button:focus-visible,
+.text-button:focus-visible,
+.edit-food-button:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.edit-food-button,
+.scan-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  cursor: pointer;
+}
+
+.edit-food-button {
+  border: none;
+}
+
+.sheet-title {
+  margin: 0;
+  padding-right: var(--size-touch-target-min);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.search-input,
+.form-field input,
+.amount-input-wrap input {
+  min-height: var(--size-touch-target-min);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+}
+
+.search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0 var(--space-4);
+}
+
+.scan-button {
+  flex: none;
+  width: var(--size-touch-target-min);
+  height: var(--size-touch-target-min);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+}
+
+.barcode-info,
+.source-hint {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.barcode-info {
+  margin: calc(var(--space-1) * -1) 0 0;
+}
+
+.source-hint {
+  margin: calc(var(--space-2) * -1) 0 0;
+  text-align: center;
+}
+
+/* Nur für Screenreader sichtbar (Sheet-Titel im Scan-/Erfolgs-Step). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+app-barcode-scanner {
+  flex: 1;
+  min-height: 0;
+}
+
+.scan-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-4);
+  text-align: center;
+}
+
+.scan-success-text {
+  margin: 0;
+  color: var(--color-success);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+}
+
+.scan-success-summary {
+  margin: 0 0 var(--space-4);
+  color: var(--color-text);
+  font-size: var(--font-size-lg);
+}
+
+.scan-success .primary-button {
+  width: 100%;
+}
+
+.retry-button,
+.back-button,
+.danger-text-button,
+.text-button {
+  min-height: var(--size-touch-target-min);
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.retry-button,
+.danger-text-button,
+.text-button {
+  padding: 0 var(--space-4);
+}
+
+.text-button {
+  width: 100%;
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+}
+
+/* Ladezustand: Skeleton statt Spinner. */
+.state-loading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.skeleton-row {
+  height: var(--size-touch-target-min);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+}
+
+.state-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  text-align: center;
+  padding: var(--space-6) 0;
+}
+
+.error-text,
+.retry-button,
+.back-button {
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+}
+
+.error-text {
+  margin: 0;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-6) 0;
+  text-align: center;
+}
+
+
+.primary-button {
+  min-height: var(--size-touch-target-min);
+  padding: 0 var(--space-6);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
+  color: var(--color-accent-on);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+.primary-button:disabled {
+  background: var(--color-neutral-300);
+  color: var(--color-text-disabled);
+  cursor: not-allowed;
+}
+
+.result-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.result-item {
+  display: flex;
+  align-items: center;
+}
+
+.result-item + .result-item {
+  border-top: 1px solid var(--color-border);
+}
+
+.result-row {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--size-touch-target-min);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border: none;
+  background: none;
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Marker-Slot: Geschwister von `.result-row` (kein Button-in-Button). */
+.marker-slot {
+  flex: none;
+  width: var(--size-touch-target-min);
+  min-height: var(--size-touch-target-min);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.edit-food-button {
+  padding: 0;
+  color: var(--color-text-muted);
+  flex: none;
+  width: var(--size-touch-target-min);
+  height: var(--size-touch-target-min);
+}
+
+.plausibility-banner-line-warning {
+  color: var(--color-warning);
+}
+
+.result-name,
+.step-b-title-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.result-meta {
+  flex: none;
+}
+
+.back-button {
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-2) 0 0;
+}
+
+.create-form,
+.amount-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.form-field label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+
+.form-field input {
+  padding: 0 var(--space-4);
+  text-align: left;
+}
+
+.form-field input.tnum {
+  text-align: right;
+}
+
+.field-error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--font-size-xs);
+}
+
+.step-b-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.plausibility-banner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-subtle);
+}
+
+.empty-text,
+.plausibility-banner-line {
+  margin: 0;
+}
+
+.meal-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.segment-tabs {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.segment-tab {
+  flex: 1;
+  min-height: var(--size-touch-target-min);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.segment-tab-active {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-accent-on);
+}
+
+.segment-tab:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.meal-row-disabled {
+  min-height: var(--size-touch-target-min);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  color: var(--color-text-disabled);
+  font-size: var(--font-size-sm);
+}
+
+.meal-chip {
+  min-height: var(--size-touch-target-min);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.meal-chip-selected {
+  border-color: var(--color-accent);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+.amount-input-wrap {
+  position: relative;
+}
+
+.amount-input-wrap input {
+  width: 100%;
+  padding: 0 var(--space-8) 0 var(--space-4);
+  text-align: right;
+}
+
+.result-meta,
+.unit-suffix,
+.empty-text,
+.plausibility-banner-line,
+.live-macro {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.unit-suffix {
+  position: absolute;
+  top: 50%;
+  right: var(--space-4);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.live-calc {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: center;
+  text-align: center;
+  padding: var(--space-4) 0;
+}
+
+.live-kcal {
+  margin: 0;
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+
+.live-macros {
+  display: flex;
+  gap: var(--space-4);
+}
+
+.live-macro-carbs {
+  color: var(--color-macro-carbs);
+}
+
+.live-macro-protein {
+  color: var(--color-macro-protein);
+}
+
+.live-macro-fat {
+  color: var(--color-macro-fat);
+}
+
+.save-error,
+.create-error {
+  text-align: center;
+}
+
+.danger-text-button {
+  align-self: center;
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.save-button {
+  position: sticky;
+  bottom: 0;
+  width: 100%;
+  background: var(--color-accent);
+}

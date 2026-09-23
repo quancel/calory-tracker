@@ -1,0 +1,27 @@
+<div class="copy-feedback" role="status" aria-live="polite">
+  <span class="feedback-text">
+    {{ view().count }} Einträge von {{ view().sourceDateLabel }} übernommen
+  </span>
+
+  <div class="feedback-actions">
+    <button type="button" class="undo-button" (click)="onUndoRequested()">
+      Rückgängig machen
+    </button>
+    <button
+      type="button"
+      class="close-button"
+      (click)="onClosed()"
+      aria-label="Rückmeldung schließen"
+    >
+      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+        <path
+          d="M6 6l12 12M18 6L6 18"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+        />
+      </svg>
+    </button>
+  </div>
+</div>

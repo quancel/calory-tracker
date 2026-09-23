@@ -1,0 +1,123 @@
+<div class="login-page">
+  <div class="login-card">
+    <div class="icon-circle" aria-hidden="true">
+      <svg viewBox="0 0 96 96" width="40" height="40">
+        <circle
+          cx="48"
+          cy="48"
+          r="32"
+          fill="none"
+          stroke="var(--color-accent)"
+          stroke-width="12"
+          stroke-linecap="round"
+          stroke-dasharray="167.55 33.51"
+          transform="rotate(-105 48 48)"
+        />
+      </svg>
+    </div>
+
+    <h1>Melde dich an.</h1>
+
+    <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+      @if (errorMessage(); as message) {
+        <p class="form-error" role="alert">{{ message }}</p>
+      }
+
+      <div class="field">
+        <label for="email">E-Mail</label>
+        <input
+          id="email"
+          name="email"
+          type="email"
+          autocomplete="email"
+          formControlName="email"
+          [attr.aria-invalid]="
+            form.controls.email.invalid && form.controls.email.touched ? true : null
+          "
+        />
+        @if (form.controls.email.invalid && form.controls.email.touched) {
+          <p class="field-error">
+            @if (form.controls.email.hasError('required')) {
+              E-Mail ist erforderlich.
+            } @else if (form.controls.email.hasError('email')) {
+              Bitte eine gültige E-Mail-Adresse eingeben.
+            }
+          </p>
+        }
+      </div>
+
+      <div class="field">
+        <label for="password">Passwort</label>
+        <div class="password-input-wrap">
+          <input
+            #passwordInput
+            id="password"
+            name="password"
+            [type]="passwordVisible() ? 'text' : 'password'"
+            autocomplete="current-password"
+            formControlName="password"
+            class="password-input"
+            [class.field-invalid]="errorMessage() !== null"
+            [attr.aria-invalid]="
+              (form.controls.password.invalid && form.controls.password.touched) ||
+              errorMessage() !== null
+                ? true
+                : null
+            "
+          />
+          <button
+            type="button"
+            class="visibility-toggle"
+            (click)="togglePasswordVisibility()"
+            [attr.aria-label]="passwordVisible() ? 'Passwort verbergen' : 'Passwort anzeigen'"
+            [attr.aria-pressed]="passwordVisible()"
+          >
+            @if (passwordVisible()) {
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                <path
+                  d="M3 3l18 18M10.6 10.7a3 3 0 0 0 4.2 4.2M6.6 6.7C4.1 8.3 2.3 10.6 1.4 12c1.8 3.4 5.6 7 10.6 7 1.7 0 3.3-.4 4.7-1.1M12 5c5 0 8.8 3.6 10.6 7-.6 1.1-1.4 2.3-2.4 3.4"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            } @else {
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                <path
+                  d="M1.4 12C3.2 8.6 7 5 12 5s8.8 3.6 10.6 7c-1.8 3.4-5.6 7-10.6 7S3.2 15.4 1.4 12Z"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="3"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                />
+              </svg>
+            }
+          </button>
+        </div>
+        @if (form.controls.password.invalid && form.controls.password.touched) {
+          <p class="field-error">Passwort ist erforderlich.</p>
+        }
+      </div>
+
+      <button type="submit" class="submit-button" [disabled]="submitting()">
+        @if (submitting()) {
+          <span class="spinner" aria-hidden="true"></span>
+          Meldet an...
+        } @else {
+          Anmelden
+        }
+      </button>
+    </form>
+  </div>
+</div>

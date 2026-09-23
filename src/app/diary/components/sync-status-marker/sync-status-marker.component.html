@@ -1,0 +1,30 @@
+<button
+  type="button"
+  class="sync-marker-button"
+  (click)="onClick()"
+  [attr.aria-label]="statusText() + ariaLabelSuffix()"
+  [attr.aria-expanded]="expanded()"
+>
+  @if (state() === 'pending') {
+    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+      <path
+        d="M7.5 18a4.2 4.2 0 0 1-.4-8.38 5.2 5.2 0 0 1 10.15-1.6A4.7 4.7 0 0 1 17.8 18H7.5Z"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.6"
+        stroke-linejoin="round"
+      />
+    </svg>
+  } @else {
+    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+      <path
+        d="M7.5 18a4.2 4.2 0 0 1-.4-8.38 5.2 5.2 0 0 1 10.15-1.6A4.7 4.7 0 0 1 17.8 18h-3.3"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.6"
+        stroke-linejoin="round"
+      />
+      <path d="M4 4.5 19 19" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+    </svg>
+  }
+</button>

@@ -1,0 +1,34 @@
+:host {
+  display: contents;
+}
+
+.marker-button,
+.marker-icon-inline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+}
+
+.marker-button {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.marker-button:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.marker-icon-inline {
+  flex: none;
+}
+
+.marker-button-warning,
+.marker-icon-inline-warning {
+  color: var(--color-warning);
+}

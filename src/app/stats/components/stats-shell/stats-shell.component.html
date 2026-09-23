@@ -1,0 +1,58 @@
+<div class="stats-shell">
+  <header class="stats-header">
+    <h1 class="stats-title">Verlauf</h1>
+  </header>
+
+  <app-period-switch [kind]="statsStore.periodKind()" (kindChange)="onKindChange($event)" />
+
+  <app-period-nav
+    [label]="statsStore.periodLabel()"
+    [canGoForward]="statsStore.canGoForward()"
+    (previous)="onPrevious()"
+    (next)="onNext()"
+  />
+
+  @if (statsStore.loading()) {
+    <div class="state-loading" aria-busy="true" aria-live="polite">
+      <div class="skeleton skeleton-chart"></div>
+      <div class="skeleton skeleton-bar"></div>
+      <div class="skeleton skeleton-bar"></div>
+      <div class="skeleton skeleton-bar"></div>
+    </div>
+  } @else if (statsStore.error(); as message) {
+    <div class="state-error" role="alert">
+      <p class="error-text">{{ message }}</p>
+      <button type="button" class="retry-button" (click)="statsStore.retry()">
+        Erneut versuchen
+      </button>
+    </div>
+  } @else if (statsStore.isEmpty()) {
+    <div class="state-empty">
+      <p>Noch keine Einträge in diesem Zeitraum.</p>
+      <a routerLink="/tagebuch" class="text-button">Zum Tagebuch</a>
+    </div>
+  } @else {
+    <app-bar-chart
+      [kind]="statsStore.periodKind()"
+      [bars]="statsStore.barProgress()"
+      [goalKcal]="statsStore.goalKcal()"
+      [scale]="statsStore.chartScale()"
+    />
+
+    <div class="macro-summary">
+      <app-macro-bar
+        label="Kohlenhydrate"
+        macro="carbs"
+        [progress]="statsStore.carbsAverageProgress()"
+      />
+      <app-macro-bar
+        label="Protein"
+        macro="protein"
+        [progress]="statsStore.proteinAverageProgress()"
+      />
+      <app-macro-bar label="Fett" macro="fat" [progress]="statsStore.fatAverageProgress()" />
+    </div>
+
+    <p class="average-hint">{{ averageHint() }}</p>
+  }
+</div>

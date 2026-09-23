@@ -1,0 +1,87 @@
+:host {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: block;
+}
+
+.close-button:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--color-neutral-900);
+  opacity: 0.4;
+}
+
+.sheet-panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  box-shadow: var(--elevation-high);
+  padding: var(--space-2) var(--space-4) calc(var(--space-6) + env(safe-area-inset-bottom));
+  overflow-y: auto;
+  animation: sheet-slide-in var(--duration-slow) var(--ease-out);
+}
+
+@keyframes sheet-slide-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet-panel {
+    animation: none;
+  }
+}
+
+.drag-handle {
+  align-self: center;
+  width: 32px;
+  height: 4px;
+  margin-top: var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-border-strong);
+}
+
+.close-button {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  width: var(--size-touch-target-min);
+  height: var(--size-touch-target-min);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+/* Sichtbarkeit über dem dunklen Kamerabild im Vollbild-Scanner. */
+.close-button-on-dark {
+  color: var(--color-neutral-0);
+}
+
+/* Vollbild-Scanner: volle Sheet-Höhe statt 85vh-Begrenzung. */
+.sheet-panel-fullscreen {
+  max-height: 100vh;
+  height: 100vh;
+  border-radius: 0;
+  padding: var(--space-2) var(--space-4) var(--space-4);
+}

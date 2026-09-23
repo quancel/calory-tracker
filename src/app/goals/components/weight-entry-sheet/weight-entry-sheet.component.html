@@ -1,0 +1,41 @@
+<app-bottom-sheet ariaLabelledby="weight-entry-sheet-title" (close)="onClose()">
+  <h2 id="weight-entry-sheet-title" class="sheet-title">Gewicht erfassen</h2>
+
+  <form class="sheet-form" (submit)="onSubmit($event)">
+    <label class="field-label" for="weight-entry-input">Gewicht (kg)</label>
+    <input
+      #weightInputRef
+      id="weight-entry-input"
+      class="field-input tnum"
+      type="text"
+      inputmode="decimal"
+      autocomplete="off"
+      [value]="store.weightInput()"
+      [attr.aria-invalid]="!store.weightValidation().valid ? true : null"
+      [attr.aria-describedby]="'weight-entry-feedback'"
+      (input)="onInput($event)"
+      (blur)="onBlur()"
+    />
+
+    <div class="field-feedback" id="weight-entry-feedback" role="status" aria-live="polite">
+      @if (displayedError(); as message) {
+        <p class="field-error">{{ message }}</p>
+      }
+    </div>
+
+    <button type="submit" class="submit-button" [disabled]="!store.canSubmit() || store.saving()">
+      Speichern
+    </button>
+  </form>
+
+  @if (store.pendingReplace()) {
+    <app-confirm-dialog
+      title="Gewicht für heute ersetzen?"
+      [description]="replaceDescription()"
+      confirmLabel="Ersetzen"
+      cancelLabel="Abbrechen"
+      (confirm)="onConfirmReplace()"
+      (cancel)="onCancelReplace()"
+    />
+  }
+</app-bottom-sheet>

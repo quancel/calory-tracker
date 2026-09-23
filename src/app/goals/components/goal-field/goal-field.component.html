@@ -1,0 +1,29 @@
+<div class="goal-field">
+  <label class="field-label" [for]="inputId">{{ label() }}-Ziel ({{ unit() }})</label>
+
+  <div class="field-row">
+    <input
+      [id]="inputId"
+      class="field-input tnum"
+      type="text"
+      inputmode="decimal"
+      autocomplete="off"
+      [value]="value()"
+      [attr.aria-invalid]="displayedError() ? true : null"
+      [attr.aria-describedby]="feedbackId"
+      (input)="onInput($event)"
+      (blur)="onBlur()"
+    />
+    <button type="button" class="save-button" [disabled]="!canSave()" (click)="onSave()">
+      Speichern
+    </button>
+  </div>
+
+  <div class="field-feedback" [id]="feedbackId" role="status" aria-live="polite">
+    @if (displayedError(); as message) {
+      <p class="field-error">{{ message }}</p>
+    } @else if (showSuccess()) {
+      <p class="field-success">Gespeichert</p>
+    }
+  </div>
+</div>
