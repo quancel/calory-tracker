@@ -90,6 +90,35 @@ im Supabase-Dashboard angelegt, nicht über die App:
    das Dashboard — es gibt aktuell keinen „Passwort vergessen"-Link in der
    App.
 
+## Deployment (GitHub Pages)
+
+Bei jedem Push auf `main` baut `.github/workflows/deploy-pages.yml` die App
+und veröffentlicht sie auf GitHub Pages. Einmalig vorher einzurichten:
+
+1. **Repository Secrets** anlegen (GitHub → **Settings** → **Secrets and
+   variables** → **Actions** → **New repository secret**):
+   - `SUPABASE_URL` — URL des Supabase-Projekts.
+   - `SUPABASE_ANON_KEY` — Anon-Key des Supabase-Projekts.
+
+   Beide Werte entsprechen genau dem, was lokal in
+   `src/environments/environment.ts` steht (siehe oben) — der Workflow
+   erzeugt diese Datei bei jedem Lauf frisch aus den Secrets, da sie
+   gitignored ist.
+
+2. **GitHub Pages aktivieren**: Repository → **Settings** → **Pages** →
+   unter **Build and deployment** → **Source** auf **GitHub Actions**
+   stellen (nicht „Deploy from a branch").
+
+3. Danach reicht ein normaler Push auf `main` — die Action baut mit
+   `--base-href /calory-tracker/` (passend zum Pfad
+   `https://<user>.github.io/calory-tracker/`) und legt zusätzlich ein
+   `404.html` (Kopie von `index.html`, für clientseitiges Routing ohne
+   Server-Rewrites) sowie `.nojekyll` in den Build ab.
+
+Falls das Repository umbenannt oder unter einem anderen Pfad/eigener Domain
+veröffentlicht wird, muss der `--base-href`-Wert im Workflow entsprechend
+angepasst werden.
+
 ## Datenbank/Migrationen
 
 Schema und Row Level Security liegen als SQL-Migrationen im Repo unter

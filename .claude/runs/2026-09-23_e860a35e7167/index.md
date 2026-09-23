@@ -24,3 +24,4 @@ den JSON-Dateien daneben.
 | 2026-09-23T06:45:04Z | — | _Nutzer-Eingabe_ | — | — | — | `prompts.md` (wir sollten auch anzeigen, was wir berechnet haben damit die) |
 | 2026-09-23T06:53:57Z | — | _Nutzer-Eingabe_ | — | — | — | `prompts.md` (ok passt. ich denke die liste der zutaten könnte etwas lang ) |
 | 2026-09-23T07:10:30Z | — | _Nutzer-Eingabe_ | — | — | — | `prompts.md` (ja, committe und push alles) |
+| 2026-09-23T07:11:09Z | — | _Nutzer-Eingabe_ | — | — | — | `prompts.md` (kannst du eine github action einbauen, die bei push auf main) |

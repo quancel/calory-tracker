@@ -1,0 +1,68 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      # environment.ts ist gitignored (ADR-0003) und muss hier aus den
+      # Repository-Secrets erzeugt werden — siehe README für die
+      # benötigten Secrets SUPABASE_URL / SUPABASE_ANON_KEY.
+      - name: environment.ts aus Secrets erzeugen
+        run: |
+          cat > src/environments/environment.ts <<EOF
+          export const environment = {
+            supabaseUrl: '${{ secrets.SUPABASE_URL }}',
+            supabaseAnonKey: '${{ secrets.SUPABASE_ANON_KEY }}',
+          };
+          EOF
+
+      - name: Build (production, Base-Href für GitHub Pages Subpath)
+        run: npx ng build --configuration production --base-href /calory-tracker/
+
+      # GitHub Pages kennt kein SPA-Routing: 404.html (= Kopie von index.html)
+      # sorgt dafür, dass direkte/aktualisierte Aufrufe von z.B. /tagebuch
+      # trotzdem die Angular-App laden statt einen echten 404 zu zeigen.
+      # .nojekyll verhindert, dass GitHub Pages den Output durch Jekyll
+      # verarbeitet (würde u.a. Dateien/Ordner mit führendem Unterstrich
+      # ignorieren).
+      - name: SPA-Fallback und .nojekyll ergänzen
+        run: |
+          cp dist/calory-tracker/browser/index.html dist/calory-tracker/browser/404.html
+          touch dist/calory-tracker/browser/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/calory-tracker/browser
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

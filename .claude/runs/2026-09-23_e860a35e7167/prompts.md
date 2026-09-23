@@ -304,3 +304,9 @@ ok passt. ich denke die liste der zutaten könnte etwas lang werden, wenn dort 1
 ```
 ja, committe und push alles
 ```
+
+## 2026-09-23T07:11:09Z
+
+```
+kannst du eine github action einbauen, die bei push auf main die app baut und auf github pages veröffentlicht? was müssen wir dafür machen vorher?
+```
