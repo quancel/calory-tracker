@@ -18,5 +18,14 @@ export const SERVER_RESULT_LIMIT = 20;
  */
 export const MIN_SERVER_QUERY_LENGTH = 2;
 
+/**
+ * Höchstzahl angezeigter LOKALER Treffer, nach der Rang-Sortierung gekürzt.
+ * Nutzerentscheidung 2026-10-01: ohne Grenze rendert ein Zeichen, das fast
+ * alles trifft, bei 5.000+ lokalen Foods ~5.000 Zeilen (gemessen ~666 ms).
+ * Gilt für Step A und M2 gleich; die Dubletten-Prüfung der Server-Treffer
+ * läuft weiterhin gegen den GESAMTEN lokalen Treffer-Satz.
+ */
+export const LOCAL_RESULT_LIMIT = 50;
+
 /** Länge der „Zuletzt verwendet"-Liste bei leerer Suche (Step A und M2 zeigen dasselbe). */
 export const RECENT_FOODS_LIMIT = 10;

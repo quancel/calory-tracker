@@ -3,6 +3,7 @@ import {
   dedupeServerHits,
   foodTextTier,
   isSearchStatusReserved,
+  limitLocalResults,
   mergeLocalAndServer,
   rankLocalFoods,
   resolveSearchEmptyState,
@@ -20,7 +21,7 @@ import {
   validateAmountField,
   validateNameField,
 } from './foods.calculations';
-import { SERVER_RESULT_LIMIT } from './food-search.constants';
+import { LOCAL_RESULT_LIMIT, SERVER_RESULT_LIMIT } from './food-search.constants';
 import type { Food } from './foods.service';
 
 function makeFood(overrides: Partial<Food> = {}): Food {
@@ -555,5 +556,21 @@ describe('resolveSearchEmptyState', () => {
       kind: 'no-hit',
       minCharsHint: true,
     });
+  });
+});
+
+describe('limitLocalResults (Obergrenze lokaler Treffer)', () => {
+  it('cuts after the ranking and keeps the order', () => {
+    const ranked = Array.from({ length: 80 }, (_, i) => makeFood({ id: `r${i}` }));
+
+    const limited = limitLocalResults(ranked);
+
+    expect(limited).toHaveLength(LOCAL_RESULT_LIMIT);
+    expect(LOCAL_RESULT_LIMIT).toBe(50);
+    expect(limited.map((f) => f.id)).toEqual(ranked.slice(0, 50).map((f) => f.id));
+  });
+
+  it('leaves shorter lists untouched', () => {
+    expect(limitLocalResults([makeFood({ id: 'a' })])).toHaveLength(1);
   });
 });

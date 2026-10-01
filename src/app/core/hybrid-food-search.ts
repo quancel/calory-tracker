@@ -6,6 +6,7 @@ import {
   type ServerSearchPhase,
   dedupeServerHits,
   isSearchStatusReserved,
+  limitLocalResults,
   mergeLocalAndServer,
   rankLocalFoods,
   resolveSearchEmptyState,
@@ -43,10 +44,13 @@ export function createHybridFoodSearch() {
 
   const trimmedLength = computed(() => queryState().trim().length);
 
-  const localResults = computed(() =>
+  // Gesamter lokaler Treffer-Satz (nur Rang) — Grundlage der Dubletten-Prüfung;
+  // angezeigt werden davon höchstens LOCAL_RESULT_LIMIT.
+  const localRanked = computed(() =>
     rankLocalFoods(coreFoods.foods(), queryState(), coreFoods.ownUseCounts()),
   );
-  const serverResults = computed(() => dedupeServerHits(localResults(), hitsState()));
+  const localResults = computed(() => limitLocalResults(localRanked()));
+  const serverResults = computed(() => dedupeServerHits(localRanked(), hitsState()));
   const results = computed(() => mergeLocalAndServer(localResults(), serverResults()));
 
   const status = computed(() =>
@@ -150,7 +154,7 @@ export function createHybridFoodSearch() {
     query: queryState.asReadonly(),
     setQuery,
     retry,
-    /** Lokale Treffer, bereits nach `rankLocalFoods` sortiert; bei leerer Eingabe `[]`. */
+    /** Lokale Treffer, nach `rankLocalFoods` sortiert und auf `LOCAL_RESULT_LIMIT` gekürzt; bei leerer Eingabe `[]`. */
     localResults,
     /** Server-Gruppe nach Duplikat-Abzug und Kürzung auf `SERVER_RESULT_LIMIT`. */
     serverResults,

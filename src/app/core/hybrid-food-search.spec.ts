@@ -1,7 +1,7 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { ConnectivityService } from './connectivity.service';
-import { SERVER_RESULT_LIMIT } from './food-search.constants';
+import { LOCAL_RESULT_LIMIT, SERVER_RESULT_LIMIT } from './food-search.constants';
 import type { LocalFoodsState } from './foods.calculations';
 import { CoreFoodsService, type Food, type ServerSearchResult } from './foods.service';
 import { SERVER_SEARCH_DEBOUNCE_MS, createHybridFoodSearch } from './hybrid-food-search';
@@ -129,6 +129,36 @@ describe('createHybridFoodSearch (ADR-0021 Punkt 10)', () => {
     expect(search.results()[0].id).toBe('local');
     expect(search.results()).toHaveLength(1 + SERVER_RESULT_LIMIT);
     expect(search.announcement()).toBe(`${SERVER_RESULT_LIMIT} Treffer online`);
+  });
+
+  it('shows at most LOCAL_RESULT_LIMIT local hits, but dedupes server hits against ALL local hits', async () => {
+    foods.set(
+      Array.from({ length: 70 }, (_, i) =>
+        makeFood({
+          id: `l${i}`,
+          name: `Joghurt ${String(i).padStart(2, '0')}`,
+          barcode: i === 65 ? '4001' : null,
+        }),
+      ),
+    );
+    searchServer.mockResolvedValue({
+      status: 'success',
+      hits: [
+        hit(makeFood({ id: 'l69', name: 'Joghurt 69' })), // nur wegen der Kürzung nicht angezeigt
+        hit(makeFood({ id: 'other', name: 'Joghurt Barcode', barcode: '4001' })), // Barcode von l65
+        hit(makeFood({ id: 'srv', name: 'Joghurt Server' })),
+      ],
+    });
+    const search = create();
+
+    search.setQuery('joghurt');
+    await vi.advanceTimersByTimeAsync(SERVER_SEARCH_DEBOUNCE_MS);
+
+    expect(search.localResults()).toHaveLength(LOCAL_RESULT_LIMIT);
+    expect(search.results().filter((f) => f.id === 'l69')).toEqual([]);
+    expect(search.serverResults().map((f) => f.id)).toEqual(['srv']);
+    expect(search.results()).toHaveLength(LOCAL_RESULT_LIMIT + 1);
+    expect(search.results()[LOCAL_RESULT_LIMIT].id).toBe('srv');
   });
 
   it('keeps local rows in place when server hits arrive', async () => {

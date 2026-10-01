@@ -13,7 +13,7 @@ import {
   KCAL_DEVIATION_THRESHOLD,
   MACRO_SUM_MAX_G_PER_100G,
 } from './nutrition.constants';
-import { MIN_SERVER_QUERY_LENGTH, SERVER_RESULT_LIMIT } from './food-search.constants';
+import { LOCAL_RESULT_LIMIT, MIN_SERVER_QUERY_LENGTH, SERVER_RESULT_LIMIT } from './food-search.constants';
 import type { Food } from './foods.service';
 
 /**
@@ -98,6 +98,11 @@ export function rankLocalFoods(
       compareText(a.food.id, b.food.id),
   );
   return ranked.map((entry) => entry.food);
+}
+
+/** Kürzt die bereits nach Rang sortierten lokalen Treffer auf die Anzeigegrenze (Step A und M2 identisch). */
+export function limitLocalResults(ranked: readonly Food[], limit: number = LOCAL_RESULT_LIMIT): Food[] {
+  return ranked.length > limit ? ranked.slice(0, limit) : [...ranked];
 }
 
 /** Codepoint-Vergleich (wie `order by name, id` ohne Locale) — deterministisch, kein `localeCompare`. */
