@@ -4,7 +4,9 @@
 liefern Vorschläge über `notes_for_conventions` im Handoff.
 
 - **Modus**: `vorgegeben` (Greenfield, festgelegt in ADR-0001)
-- **Zuletzt geprüft**: 2026-09-30 (Foods-Lesepfad, Offline-Lesecache,
+- **Zuletzt geprüft**: 2026-10-01 (Abschnitt „Werkzeuge (`scripts/`)",
+  Barcode-Regel, `supabase/data/`, Paket PO-2026-09-30-002, ADR-0022; davor
+  2026-09-30 Foods-Lesepfad, Offline-Lesecache,
   Such-Konstanten, `core/`-Factory und Statuszeile für die Hybrid-Suche,
   Paket PO-2026-09-30-003, ADR-0021; davor Backend-Abschnitt RPC/Extension/
   Prüfabfragen, PO-2026-09-30-001, ADR-0020)
@@ -304,6 +306,12 @@ src/
   Icons als Inline-SVG wie im übrigen Projekt. Ein eigener
   Lade-/Fehlerblock für den Food-Bestand in einem Sheet ist ab hier eine
   Abweichung (ADR-0021 Punkt 13).
+- Barcodes: Jeder Schreibweg, der einen Barcode speichert, speichert
+  `normalizeBarcode(raw) ?? raw.trim()`; jeder Lookup sucht über
+  `barcodeLookupKeys(raw)` (`.in('barcode', keys)`, Treffer mit kanonischer
+  Form bevorzugt) — nie `.eq` auf den Rohwert des Detektors. Beide
+  Funktionen in `food-search/food-search.calculations.ts`, mitgenutzt vom
+  OFF-Import (ADR-0022 Punkt 4).
 - Reine Food-/Nährwert-Rechenlogik mit mehr als einem nutzenden Feature
   (Filter, Mengen-/Live-Berechnung, Plausibilitäts-/Vollständigkeitsprüfung,
   generische Feldvalidierung): `src/app/core/foods.calculations.ts`; die
@@ -396,6 +404,7 @@ src/
 supabase/
   migrations/<YYYYMMDDHHMMSS>_<beschreibung>.sql   # Schema + RLS + Funktionen, fortlaufend
   checks/<YYYYMMDDHHMMSS>_<beschreibung>.sql       # Prüfabfragen zu einer Migration (ADR-0020)
+  data/<quelle>/<quelle>-<NNNN>.sql                 # erzeugte Daten-Chargen, gitignored (ADR-0022)
   seed.sql                                          # optional, keine echten Daten
 ~~~
 
@@ -444,6 +453,48 @@ supabase/
 - Spalten, die ein Import aus einer externen Quelle füllt, tragen deren
   Präfix (`off_popularity`) und bekommen `not null default <neutral>`, damit
   App-Inserts unverändert bleiben (ADR-0020 Punkt 2).
+- **Daten-Chargen** (`supabase/data/<quelle>/`) sind keine Migrationen: nur
+  DML auf die Zieltabelle, je Datei eine Transaktion (`begin; set local
+  statement_timeout …; … commit;`), kein `create`/`drop`/`alter`/`truncate`,
+  einzeln und wiederholt einspielbar ohne Fehler und ohne Dubletten,
+  bestehende Zeilen werden nicht überschrieben (Ausnahme nur, was ein ADR
+  ausdrücklich freigibt, z. B. `off_popularity`). Kopfkommentar mit Quelle,
+  Lizenz, Charge i/N, Zeilenzahl, vorausgesetzter Migration. Erzeugt, nicht
+  von Hand editiert; gitignored (ADR-0022 Punkt 5/7).
+
+## Werkzeuge (`scripts/`, ADR-0022)
+
+~~~
+scripts/
+  <werkzeug>/
+    <einstieg>.ts                  # nur I/O: CLI-Argumente, Streams, Dateien, Statistik-Ausgabe
+    <werkzeug>.calculations.ts     # reine Logik, ohne node:-Import, getestet
+    <werkzeug>.calculations.spec.ts
+    register-ts-resolve.mjs        # Resolve-Hook (nur relative Spezifizierer ohne Endung → .ts)
+    tsconfig.json                  # noEmit, allowImportingTsExtensions, types ["node"]
+    vitest.config.ts               # environment node, include nur dieses Verzeichnis
+~~~
+
+- Sprache TypeScript, ausgeführt mit Node aus `.nvmrc` per Type Stripping:
+  `node --import ./scripts/<werkzeug>/register-ts-resolve.mjs
+  scripts/<werkzeug>/<einstieg>.ts`. Kein `tsx`/`ts-node`/`esbuild`, keine
+  Laufzeit-Abhängigkeit; nur löschbare TS-Syntax (kein `enum`, keine
+  Parameter-Properties, kein `namespace`). Eigene relative Importe mit
+  `.ts`-Endung.
+- npm-Skripte je Werkzeug: `<werkzeug>:generate|run`, `<werkzeug>:typecheck`
+  (`tsc -p scripts/<werkzeug>/tsconfig.json`), `<werkzeug>:test` (`vitest
+  run --config scripts/<werkzeug>/vitest.config.ts`). `npm test` (`ng test`)
+  bleibt die App-Suite und schließt `scripts/` nicht ein.
+- Aus `src/app` werden ausschließlich **reine** `*.calculations.ts` /
+  `*.constants.ts` importiert — nie Dienste, Stores, Komponenten, nie etwas
+  mit Angular-/Supabase-Laufzeitimport; Regeln werden importiert, nie
+  kopiert. `src/app` importiert nie aus `scripts/`.
+- Technische Betriebswerte (Chargengröße, Dateigrößen-Obergrenze,
+  Ausgabeort) als exportierte Konstanten in der Datei, die sie nutzt.
+- Ein Werkzeug, das Daten erzeugt, schreibt deterministisch (gleiche Eingabe
+  ⇒ byte-gleiche Ausgabe, kein Zeitstempel im Inhalt) und nach
+  `supabase/data/<quelle>/`. Netz- oder Datenbankzugriff nur, wenn ein ADR
+  ihn vorsieht — der OFF-Import hat keinen.
 
 ## Abweichungen
 

@@ -4,9 +4,9 @@
 Rollen lesen.
 
 - **Angelegt**: 2026-09-20 (Paket PO-2026-09-20-001, Greenfield)
-- **Zuletzt geprüft**: 2026-09-30 (Paket PO-2026-09-30-003, Hybrid-Suche,
-  ADR-0021 — **kein** neuer Context; lokaler Food-Bestand bleibt in
-  `core/foods.service.ts`, Persistenz über `offline-sync`)
+- **Zuletzt geprüft**: 2026-10-01 (Paket PO-2026-09-30-002, DACH-Import,
+  ADR-0022 — **kein** neuer Context; das Import-Werkzeug gehört zu
+  `data-platform`, die Barcode-Regel zu `food-catalog`)
 
 Register, kein Design-Dokument. Details gehören in ADRs.
 
@@ -22,7 +22,7 @@ Register, kein Design-Dokument. Details gehören in ADRs.
 | `goals` | `src/app/goals/` | Tagesziele (kcal, Makros) je Nutzer; ab Paket 015 zusätzlich Gewichtslog (Erfassen, Liniendiagramm) und der daraus abgeleitete Kalorienziel-Vorschlag (ADR-0017) | frontend-lead |
 | `stats` | `src/app/stats/` | Verlauf (Woche/Monat), Balken-Chart — **kein** Gewichtslog (ADR-0017 Punkt 1; der frühere Platzhalter „optional Gewichtslog" ist hiermit aufgelöst) | frontend-lead |
 | `offline-sync` | `src/app/core/connectivity.service.ts`, `src/app/core/local-db.service.ts`, `src/app/core/entry-queue.service.ts`, `src/app/core/entry-sync.service.ts` (Dateien, kein Ordner) | Verbindungszustand, lokale Persistenz (IndexedDB), Puffer-Queue für noch nicht übertragene Einträge und deren Hintergrund-Übertragung — hinter `core/entries.service.ts`, ohne eigenen UI-Einstieg | frontend-lead |
-| `data-platform` | `supabase/` | Postgres-Schema, Row Level Security, Migrationen als SQL im Repo, lesende Postgres-Funktionen (RPC, ab ADR-0020) samt Prüfabfragen | backend-lead |
+| `data-platform` | `supabase/`, `scripts/off-import/` | Postgres-Schema, Row Level Security, Migrationen als SQL im Repo, lesende Postgres-Funktionen (RPC, ab ADR-0020) samt Prüfabfragen; lokal ausgeführter OFF-DACH-Import, der Chargen-SQL nach `supabase/data/` erzeugt (ADR-0022) | backend-lead |
 
 ## Schnittstellen zwischen Contexts
 
@@ -194,6 +194,16 @@ Nur was für Routing-Entscheidungen zählt.
   unsichtbar. `foods.off_popularity` schreibt nur der DACH-Import (Paket
   002), nie die App. Aufgerufen werden beide Funktionen ausschließlich aus
   `src/app/core/foods.service.ts` (ADR-0021).
+- `data-platform` (`scripts/off-import/`) → `food-catalog` (ab Paket
+  PO-2026-09-30-002, ADR-0022): Das Import-Werkzeug **importiert** die
+  reinen Regeln der App (`normalizeOffProduct`, `isOffProductComplete`,
+  `normalizeBarcode`, `barcodeLookupKeys` aus
+  `food-search/food-search.calculations.ts`; `findPlausibilityFindings` aus
+  `core/foods.calculations.ts`) — nur reine Rechendateien, nie Dienste, nie
+  in Gegenrichtung. Es läuft lokal beim Nutzer, ohne Netz, ohne
+  Zugangsdaten; seine Chargen schreiben nur `foods` (Insert ohne
+  Überschreiben + `off_popularity`). Scan und Import teilen die
+  **kanonische Barcode-Form**; der Scan sucht über `barcodeLookupKeys`.
 - `app-shell` → alle: stellt Routen, Tokens und den Supabase-Client aus
   `core/` bereit; enthält selbst keine Fachlogik. `MealType` und die
   Mahlzeit-Labels/-Reihenfolge liegen als gemeinsame Konstanten in
