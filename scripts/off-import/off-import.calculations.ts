@@ -57,8 +57,15 @@ export interface ImportProduct {
   readonly popularity: number;
 }
 
+/** Woher die Nährwerte stammen: Legacy-`nutriments` (`*_100g`) oder `nutrition.aggregated_set` (per 100g). */
+export type NutritionSource = 'nutriments' | 'nutrition';
+
 export type Classification =
-  | { readonly kind: 'accepted'; readonly product: ImportProduct }
+  | {
+      readonly kind: 'accepted';
+      readonly product: ImportProduct;
+      readonly nutritionSource: NutritionSource;
+    }
   | { readonly kind: 'rejected'; readonly reason: RejectReason };
 
 /** Substring-Vorfilter: Zeilen ohne eines der Länder-Tags brauchen kein `JSON.parse` (ADR-0022 Punkt 2). */
@@ -109,6 +116,80 @@ function isDach(raw: Record<string, unknown>): boolean {
   return Array.isArray(tags) && tags.some((tag) => DACH_COUNTRY_TAGS.includes(tag as string));
 }
 
+export interface Nutrients100g {
+  readonly kcal: number | undefined;
+  readonly kj: number | undefined;
+  readonly protein: number | undefined;
+  readonly carbs: number | undefined;
+  readonly fat: number | undefined;
+}
+
+const NO_NUTRIENTS: Nutrients100g = {
+  kcal: undefined,
+  kj: undefined,
+  protein: undefined,
+  carbs: undefined,
+  fat: undefined,
+};
+
+function hasAnyNutrient(values: Nutrients100g): boolean {
+  return Object.values(values).some((value) => value !== undefined);
+}
+
+/** Wert eines Nährstoffs aus `nutrition.aggregated_set.nutrients`; nur mit passender Einheit, sonst fehlend. */
+function aggregatedValue(
+  nutrients: Record<string, unknown>,
+  key: string,
+  unit: string,
+): number | undefined {
+  const entry = nutrients[key];
+  if (!isRecord(entry) || entry['unit'] !== unit) return undefined;
+  return toFiniteNumber(entry['value']);
+}
+
+/**
+ * Nährwerte je 100 g (nur endliche Zahlen oder `undefined`, ADR-0022 Punkt 3).
+ * Quelle 1: Legacy-`nutriments.*_100g` (Vorgabe von ADR-0010/0022). Quelle 2
+ * nur, wenn dort KEIN Wert steht: `nutrition.aggregated_set` mit `per === '100g'`
+ * (kcal oder kJ, Protein, Kohlenhydrate, Fett in `g`). Grund: Im JSONL-Export
+ * ist `nutriments` bei den meisten neueren DACH-Produkten leer (`{}`) und die
+ * Werte stehen nur noch im `nutrition`-Objekt (gemessen am Export vom
+ * 2026-10-01: ohne Quelle 2 bleiben ~4 % der DACH-Produkte vollständig).
+ * `per === '100ml'` zählt bewusst nicht (die App führt Werte je 100 g).
+ */
+export function extractNutrientsPer100g(raw: Record<string, unknown>): {
+  values: Nutrients100g;
+  source: NutritionSource;
+} {
+  const nutriments = isRecord(raw['nutriments']) ? raw['nutriments'] : {};
+  const legacy: Nutrients100g = {
+    kcal: toFiniteNumber(nutriments['energy-kcal_100g']),
+    kj: toFiniteNumber(nutriments['energy_100g']),
+    protein: toFiniteNumber(nutriments['proteins_100g']),
+    carbs: toFiniteNumber(nutriments['carbohydrates_100g']),
+    fat: toFiniteNumber(nutriments['fat_100g']),
+  };
+  if (hasAnyNutrient(legacy)) return { values: legacy, source: 'nutriments' };
+
+  const nutrition = raw['nutrition'];
+  const aggregated = isRecord(nutrition) ? nutrition['aggregated_set'] : undefined;
+  if (!isRecord(aggregated) || aggregated['per'] !== '100g' || !isRecord(aggregated['nutrients'])) {
+    return { values: NO_NUTRIENTS, source: 'nutriments' };
+  }
+  const nutrients = aggregated['nutrients'];
+  return {
+    values: {
+      kcal: aggregatedValue(nutrients, 'energy-kcal', 'kcal'),
+      kj:
+        aggregatedValue(nutrients, 'energy-kj', 'kJ') ?? aggregatedValue(nutrients, 'energy', 'kJ'),
+      protein: aggregatedValue(nutrients, 'proteins', 'g'),
+      carbs: aggregatedValue(nutrients, 'carbohydrates', 'g'),
+      fat: aggregatedValue(nutrients, 'fat', 'g'),
+    },
+    source: 'nutrition',
+  };
+}
+
 /**
  * Klassifiziert ein geparstes OFF-Produkt (Reihenfolge = `REJECT_REASONS`):
  * kein DACH-Land → kein kanonischer Barcode → kein Name → ein Nährwert fehlt →
@@ -126,12 +207,8 @@ export function classifyOffRecord(raw: unknown): Classification {
   const name = composeName(raw);
   if (name === '') return { kind: 'rejected', reason: 'no-name' };
 
-  const nutriments = isRecord(raw['nutriments']) ? raw['nutriments'] : {};
-  const kcal = toFiniteNumber(nutriments['energy-kcal_100g']);
-  const kj = toFiniteNumber(nutriments['energy_100g']);
-  const protein = toFiniteNumber(nutriments['proteins_100g']);
-  const carbs = toFiniteNumber(nutriments['carbohydrates_100g']);
-  const fat = toFiniteNumber(nutriments['fat_100g']);
+  const { values, source: nutritionSource } = extractNutrientsPer100g(raw);
+  const { kcal, kj, protein, carbs, fat } = values;
 
   // Der Energiewert, den die Normalisierung verwenden würde: kcal, sonst kJ.
   const usedEnergy = kcal ?? kj;
@@ -175,6 +252,7 @@ export function classifyOffRecord(raw: unknown): Classification {
       fatG100g: product.fatG100g,
       popularity: toPopularity(raw['unique_scans_n']),
     },
+    nutritionSource,
   };
 }
 
@@ -310,6 +388,8 @@ export interface ImportStats {
   /** Per Substring-Vorfilter ohne `JSON.parse` übersprungen. */
   prefiltered: number;
   accepted: number;
+  /** Davon mit Nährwerten aus `nutrition.aggregated_set` statt Legacy-`nutriments`. */
+  acceptedFromNutrition: number;
   rejected: Record<RejectReason, number>;
   /** Kandidat verdrängte einen Vorgänger mit gleichem kanonischem Barcode. */
   replacedDuplicates: number;
@@ -322,6 +402,7 @@ export function createStats(): ImportStats {
     linesRead: 0,
     prefiltered: 0,
     accepted: 0,
+    acceptedFromNutrition: 0,
     rejected: Object.fromEntries(REJECT_REASONS.map((reason) => [reason, 0])) as Record<
       RejectReason,
       number
@@ -343,7 +424,11 @@ export interface OutputSummary {
 
 /** Statistik als Textzeilen für stdout. */
 export function formatStats(stats: ImportStats, output: OutputSummary): string[] {
-  const dachParsed = stats.linesRead - stats.prefiltered - stats.rejected['parse-error'] - stats.rejected['not-dach'];
+  const dachParsed =
+    stats.linesRead -
+    stats.prefiltered -
+    stats.rejected['parse-error'] -
+    stats.rejected['not-dach'];
   const dachRejected =
     stats.rejected['no-barcode'] +
     stats.rejected['no-name'] +
@@ -361,6 +446,7 @@ export function formatStats(stats: ImportStats, output: OutputSummary): string[]
     `  verworfen, unvollständig:     ${stats.rejected['incomplete']}`,
     `  verworfen, unplausibel:       ${stats.rejected['implausible']} (${percent(stats.rejected['implausible'], dachParsed)} der DACH-Produkte, ${percent(stats.rejected['implausible'], dachParsed - stats.rejected['no-barcode'] - stats.rejected['no-name'] - stats.rejected['incomplete'])} der vollständigen)`,
     `  übernommen:                   ${stats.accepted} (${percent(stats.accepted, dachParsed)}; verworfen gesamt ${dachRejected})`,
+    `    davon Nährwerte aus nutrition:  ${stats.acceptedFromNutrition}`,
     `  Dubletten (gleicher Barcode): ${stats.replacedDuplicates + stats.droppedDuplicates} (${stats.replacedDuplicates} ersetzt, ${stats.droppedDuplicates} verworfen)`,
     `Geschrieben:                    ${output.products.length} Produkte in ${output.chunkCount} Chargen`,
     `  mit unique_scans_n > 0:       ${withScans} (${percent(withScans, output.products.length)})`,

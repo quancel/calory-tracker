@@ -1,7 +1,9 @@
 import { Injectable, inject } from '@angular/core';
 import { SupabaseService } from '../core/supabase.service';
 import {
+  barcodeLookupKeys,
   isOffProductComplete,
+  normalizeBarcode,
   normalizeOffProduct,
   offProductToCreateForm,
   type CreateFoodFormValues,
@@ -59,18 +61,30 @@ export class FoodSearchService {
    * kennt nicht alle Datensätze, z. B. vom zweiten Nutzer angelegte).
    */
   async findByBarcode(barcode: string): Promise<FindByBarcodeResult> {
+    // ADR-0022 Punkt 4: Suche über alle Lookup-Schlüssel (kanonische Form,
+    // ggf. 12-stellige UPC-A-Form, getrimmter Rohwert), damit auch vor der
+    // Regel gespeicherte Rohwerte gefunden werden. Zwei Treffer sind möglich.
+    const keys = barcodeLookupKeys(barcode);
+    if (keys.length === 0) {
+      return { success: true, food: null };
+    }
+
     const response = await this.supabase.client
       .from('foods')
       .select(FOOD_COLUMNS)
-      .eq('barcode', barcode)
-      .maybeSingle();
+      .in('barcode', keys);
 
     if (response.error) {
       return { success: false, message: 'Food konnte nicht geladen werden.' };
     }
 
-    const raw = response.data as unknown as RawFoodRow | null;
-    return { success: true, food: raw ? toFood(raw) : null };
+    const rows = (response.data ?? []) as unknown as RawFoodRow[];
+    const canonical = normalizeBarcode(barcode);
+    const picked =
+      (canonical !== null ? rows.find((row) => row.barcode === canonical) : undefined) ??
+      keys.map((key) => rows.find((row) => row.barcode === key)).find((row) => row !== undefined) ??
+      null;
+    return { success: true, food: picked ? toFood(picked) : null };
   }
 
   /**
@@ -81,7 +95,10 @@ export class FoodSearchService {
    * gespeichert, sondern als Vorbelegung für Step A2 zurückgegeben.
    */
   async lookupBarcode(barcode: string): Promise<BarcodeLookupResult> {
-    const localResult = await this.findByBarcode(barcode);
+    // Kanonischer Schlüssel (ADR-0022 Punkt 4); nicht-numerische Codes
+    // (z. B. code_128) bleiben der getrimmte Rohwert.
+    const key = normalizeBarcode(barcode) ?? barcode.trim();
+    const localResult = await this.findByBarcode(key);
     if (!localResult.success) {
       return { status: 'error', message: localResult.message };
     }
@@ -89,7 +106,7 @@ export class FoodSearchService {
       return { status: 'found', food: localResult.food };
     }
 
-    const offResult = await this.offService.fetchProductByBarcode(barcode);
+    const offResult = await this.offService.fetchProductByBarcode(key);
     if (offResult.status === 'not-found') {
       return { status: 'not-found' };
     }
@@ -97,7 +114,7 @@ export class FoodSearchService {
       return { status: 'error', message: offResult.message };
     }
 
-    const normalized = normalizeOffProduct(offResult.product, barcode);
+    const normalized = normalizeOffProduct(offResult.product, key);
     if (!isOffProductComplete(normalized)) {
       return { status: 'off-incomplete', prefill: offProductToCreateForm(normalized) };
     }

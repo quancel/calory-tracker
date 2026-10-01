@@ -337,137 +337,166 @@ describe('FoodSearchService.updateFood (Step C, ADR-0011 Punkt 6)', () => {
   });
 });
 
-describe('FoodSearchService.findByBarcode', () => {
-  it('queries by barcode, not the session cache (ADR-0010 Punkt 4)', async () => {
-    const response = {
-      data: {
-        id: 'f1',
-        name: 'Apfel',
-        kcal_100g: 52,
-        protein_100g: 0.3,
-        carbs_100g: 14,
-        fat_100g: 0.2,
-        default_portion_g: null,
-        source: 'manual',
-        barcode: '4008400123456',
-      },
-      error: null,
-    };
-    const eq = vi.fn().mockReturnValue({ maybeSingle: vi.fn().mockResolvedValue(response) });
-    const select = vi.fn().mockReturnValue({ eq });
-    const from = vi.fn().mockReturnValue({ select });
+function foodRow(id: string, barcode: string | null) {
+  return {
+    id,
+    name: 'Apfel',
+    kcal_100g: 52,
+    protein_100g: 0.3,
+    carbs_100g: 14,
+    fat_100g: 0.2,
+    default_portion_g: null,
+    source: 'manual',
+    barcode,
+  };
+}
 
-    TestBed.resetTestingModule();
-    TestBed.configureTestingModule({
-      providers: [{ provide: SupabaseService, useValue: { client: { from } } }],
-    });
+/** Supabase-Stub für `.from('foods').select(...).in('barcode', keys)` (ADR-0022 Punkt 4). */
+function configureLookupSupabase(rows: unknown[] | null, error: unknown = null) {
+  const inFn = vi.fn().mockResolvedValue({ data: rows, error });
+  const select = vi.fn().mockReturnValue({ in: inFn });
+  const insert = vi.fn().mockReturnValue({
+    select: vi.fn().mockReturnValue({
+      single: vi.fn().mockResolvedValue({
+        data: { ...foodRow('new-off', '4008400123456'), name: 'Müsli', source: 'off' },
+        error: null,
+      }),
+    }),
+  });
+  const from = vi.fn().mockReturnValue({ select, insert });
+
+  TestBed.resetTestingModule();
+  TestBed.configureTestingModule({
+    providers: [{ provide: SupabaseService, useValue: { client: { from } } }],
+  });
+  return { from, inFn, insert };
+}
+
+describe('FoodSearchService.findByBarcode (ADR-0022 Punkt 4)', () => {
+  it('queries by all lookup keys with .in, not the session cache (ADR-0010 Punkt 4)', async () => {
+    const { from, inFn } = configureLookupSupabase([foodRow('f1', '4008400123456')]);
 
     const service = TestBed.inject(FoodSearchService);
     const result = await service.findByBarcode('4008400123456');
 
     expect(from).toHaveBeenCalledWith('foods');
-    expect(eq).toHaveBeenCalledWith('barcode', '4008400123456');
+    expect(inFn).toHaveBeenCalledWith('barcode', ['4008400123456']);
     expect(result).toEqual({
       success: true,
       food: expect.objectContaining({ id: 'f1', barcode: '4008400123456' }),
     });
   });
 
+  it('a 12-digit scan finds the row with the 13-digit canonical form', async () => {
+    const { inFn } = configureLookupSupabase([foodRow('f1', '0036000291452')]);
+
+    const result = await TestBed.inject(FoodSearchService).findByBarcode('036000291452');
+
+    expect(inFn).toHaveBeenCalledWith('barcode', ['0036000291452', '036000291452']);
+    expect(result).toEqual({ success: true, food: expect.objectContaining({ id: 'f1' }) });
+  });
+
+  it('a 13-digit scan finds a legacy row stored with the 12-digit raw value', async () => {
+    configureLookupSupabase([foodRow('alt', '036000291452')]);
+
+    const result = await TestBed.inject(FoodSearchService).findByBarcode('0036000291452');
+
+    expect(result).toEqual({ success: true, food: expect.objectContaining({ id: 'alt' }) });
+  });
+
+  it('two hits: the row with the canonical barcode wins, regardless of row order', async () => {
+    configureLookupSupabase([
+      foodRow('alt', '036000291452'),
+      foodRow('kanon', '0036000291452'),
+    ]);
+
+    const result = await TestBed.inject(FoodSearchService).findByBarcode('036000291452');
+
+    expect(result).toEqual({ success: true, food: expect.objectContaining({ id: 'kanon' }) });
+  });
+
   it('returns food: null without an error when nothing matches', async () => {
-    const eq = vi
-      .fn()
-      .mockReturnValue({ maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }) });
-    const from = vi.fn().mockReturnValue({ select: vi.fn().mockReturnValue({ eq }) });
+    configureLookupSupabase([]);
 
-    TestBed.resetTestingModule();
-    TestBed.configureTestingModule({
-      providers: [{ provide: SupabaseService, useValue: { client: { from } } }],
-    });
-
-    const service = TestBed.inject(FoodSearchService);
-    const result = await service.findByBarcode('unknown');
+    const result = await TestBed.inject(FoodSearchService).findByBarcode('unknown');
 
     expect(result).toEqual({ success: true, food: null });
   });
+
+  it('returns a generic error when the query fails', async () => {
+    configureLookupSupabase(null, { message: 'boom' });
+
+    const result = await TestBed.inject(FoodSearchService).findByBarcode('4008400123456');
+
+    expect(result).toEqual({ success: false, message: 'Food konnte nicht geladen werden.' });
+  });
 });
 
-describe('FoodSearchService.lookupBarcode (ADR-0010 Punkt 4/5)', () => {
-  function configureSupabase(localFood: unknown) {
-    const eq = vi
-      .fn()
-      .mockReturnValue({
-        maybeSingle: vi.fn().mockResolvedValue({ data: localFood, error: null }),
-      });
-    const insert = vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        single: vi.fn().mockResolvedValue({
-          data: {
-            id: 'new-off',
-            name: 'Müsli',
-            kcal_100g: 400,
-            protein_100g: 8,
-            carbs_100g: 65,
-            fat_100g: 10,
-            default_portion_g: null,
-            source: 'off',
-            barcode: '123',
-          },
-          error: null,
-        }),
-      }),
-    });
-    const from = vi.fn().mockReturnValue({ select: vi.fn().mockReturnValue({ eq }), insert });
-
-    TestBed.resetTestingModule();
-    TestBed.configureTestingModule({
-      providers: [{ provide: SupabaseService, useValue: { client: { from } } }],
-    });
-    return { from, insert };
-  }
+describe('FoodSearchService.lookupBarcode (ADR-0010 Punkt 4/5, ADR-0022 Punkt 4)', () => {
+  const completeOff = {
+    status: 'found',
+    product: {
+      product_name: 'Müsli',
+      nutriments: {
+        'energy-kcal_100g': 400,
+        proteins_100g: 8,
+        carbohydrates_100g: 65,
+        fat_100g: 10,
+      },
+    },
+  };
 
   it('returns "found" from the DB without calling Open Food Facts', async () => {
-    configureSupabase({
-      id: 'f1',
-      name: 'Apfel',
-      kcal_100g: 52,
-      protein_100g: 0.3,
-      carbs_100g: 14,
-      fat_100g: 0.2,
-      default_portion_g: null,
-      source: 'manual',
-      barcode: '123',
-    });
+    configureLookupSupabase([foodRow('f1', '4008400123456')]);
     const fetchProductByBarcode = vi.fn();
     TestBed.overrideProvider(FoodSearchOffService, { useValue: { fetchProductByBarcode } });
 
-    const service = TestBed.inject(FoodSearchService);
-    const result = await service.lookupBarcode('123');
+    const result = await TestBed.inject(FoodSearchService).lookupBarcode('4008400123456');
 
     expect(fetchProductByBarcode).not.toHaveBeenCalled();
     expect(result).toEqual({ status: 'found', food: expect.objectContaining({ id: 'f1' }) });
   });
 
-  it('saves a complete OFF hit with source "off" and returns "off-complete"', async () => {
-    const { insert } = configureSupabase(null);
-    const fetchProductByBarcode = vi.fn().mockResolvedValue({
-      status: 'found',
-      product: {
-        product_name: 'Müsli',
-        nutriments: {
-          'energy-kcal_100g': 400,
-          proteins_100g: 8,
-          carbohydrates_100g: 65,
-          fat_100g: 10,
-        },
-      },
-    });
+  it('a 12-digit scan finds a stored 13-digit canonical row, no OFF call', async () => {
+    configureLookupSupabase([foodRow('f1', '0036000291452')]);
+    const fetchProductByBarcode = vi.fn();
     TestBed.overrideProvider(FoodSearchOffService, { useValue: { fetchProductByBarcode } });
 
-    const service = TestBed.inject(FoodSearchService);
-    const result = await service.lookupBarcode('123');
+    const result = await TestBed.inject(FoodSearchService).lookupBarcode('036000291452');
 
+    expect(fetchProductByBarcode).not.toHaveBeenCalled();
+    expect(result).toEqual({ status: 'found', food: expect.objectContaining({ id: 'f1' }) });
+  });
+
+  it('a 13-digit scan finds a legacy 12-digit row, no OFF call', async () => {
+    configureLookupSupabase([foodRow('alt', '036000291452')]);
+    const fetchProductByBarcode = vi.fn();
+    TestBed.overrideProvider(FoodSearchOffService, { useValue: { fetchProductByBarcode } });
+
+    const result = await TestBed.inject(FoodSearchService).lookupBarcode('0036000291452');
+
+    expect(fetchProductByBarcode).not.toHaveBeenCalled();
+    expect(result).toEqual({ status: 'found', food: expect.objectContaining({ id: 'alt' }) });
+  });
+
+  it('two hits: the canonical row wins', async () => {
+    configureLookupSupabase([foodRow('alt', '036000291452'), foodRow('kanon', '0036000291452')]);
+
+    const result = await TestBed.inject(FoodSearchService).lookupBarcode('036000291452');
+
+    expect(result).toEqual({ status: 'found', food: expect.objectContaining({ id: 'kanon' }) });
+  });
+
+  it('saves a new complete OFF hit with the canonical barcode; OFF is asked with it too', async () => {
+    const { insert } = configureLookupSupabase([]);
+    const fetchProductByBarcode = vi.fn().mockResolvedValue(completeOff);
+    TestBed.overrideProvider(FoodSearchOffService, { useValue: { fetchProductByBarcode } });
+
+    const result = await TestBed.inject(FoodSearchService).lookupBarcode('036000291452');
+
+    expect(fetchProductByBarcode).toHaveBeenCalledWith('0036000291452');
     expect(insert.mock.calls[0][0]).toEqual(
-      expect.objectContaining({ source: 'off', barcode: '123' }),
+      expect.objectContaining({ source: 'off', barcode: '0036000291452' }),
     );
     expect(result).toEqual({
       status: 'off-complete',
@@ -475,16 +504,15 @@ describe('FoodSearchService.lookupBarcode (ADR-0010 Punkt 4/5)', () => {
     });
   });
 
-  it('does NOT save an incomplete OFF hit — returns "off-incomplete" with a prefill instead', async () => {
-    const { insert } = configureSupabase(null);
+  it('does NOT save an incomplete OFF hit — prefill carries the canonical barcode', async () => {
+    const { insert } = configureLookupSupabase([]);
     const fetchProductByBarcode = vi.fn().mockResolvedValue({
       status: 'found',
       product: { product_name: 'Unvollständig', nutriments: { proteins_100g: 5 } },
     });
     TestBed.overrideProvider(FoodSearchOffService, { useValue: { fetchProductByBarcode } });
 
-    const service = TestBed.inject(FoodSearchService);
-    const result = await service.lookupBarcode('123');
+    const result = await TestBed.inject(FoodSearchService).lookupBarcode(' 036000291452 ');
 
     expect(insert).not.toHaveBeenCalled();
     expect(result).toEqual({
@@ -496,38 +524,57 @@ describe('FoodSearchService.lookupBarcode (ADR-0010 Punkt 4/5)', () => {
         carbsG100g: '',
         fatG100g: '',
         defaultPortionG: '',
-        barcode: '123',
+        barcode: '0036000291452',
       },
     });
   });
 
+  it('non-numeric code (code_128) behaves as before: trimmed raw value for lookup, OFF and insert', async () => {
+    const { inFn, insert } = configureLookupSupabase([]);
+    const fetchProductByBarcode = vi.fn().mockResolvedValue(completeOff);
+    TestBed.overrideProvider(FoodSearchOffService, { useValue: { fetchProductByBarcode } });
+
+    await TestBed.inject(FoodSearchService).lookupBarcode(' AB-123 ');
+
+    expect(inFn).toHaveBeenCalledWith('barcode', ['AB-123']);
+    expect(fetchProductByBarcode).toHaveBeenCalledWith('AB-123');
+    expect(insert.mock.calls[0][0]).toEqual(expect.objectContaining({ barcode: 'AB-123' }));
+  });
+
   it('distinguishes "not-found" from "error"', async () => {
-    configureSupabase(null);
+    configureLookupSupabase([]);
     const fetchProductByBarcode = vi.fn().mockResolvedValue({ status: 'not-found' });
     TestBed.overrideProvider(FoodSearchOffService, { useValue: { fetchProductByBarcode } });
 
-    const service = TestBed.inject(FoodSearchService);
-    const result = await service.lookupBarcode('123');
+    const result = await TestBed.inject(FoodSearchService).lookupBarcode('4008400123456');
 
     expect(result).toEqual({ status: 'not-found' });
   });
 
   it('returns "error" with a message when Open Food Facts is unreachable', async () => {
-    configureSupabase(null);
-    const fetchProductByBarcode = vi
-      .fn()
-      .mockResolvedValue({
-        status: 'error',
-        message: 'Open Food Facts ist gerade nicht erreichbar.',
-      });
+    configureLookupSupabase([]);
+    const fetchProductByBarcode = vi.fn().mockResolvedValue({
+      status: 'error',
+      message: 'Open Food Facts ist gerade nicht erreichbar.',
+    });
     TestBed.overrideProvider(FoodSearchOffService, { useValue: { fetchProductByBarcode } });
 
-    const service = TestBed.inject(FoodSearchService);
-    const result = await service.lookupBarcode('123');
+    const result = await TestBed.inject(FoodSearchService).lookupBarcode('4008400123456');
 
     expect(result).toEqual({
       status: 'error',
       message: 'Open Food Facts ist gerade nicht erreichbar.',
     });
+  });
+
+  it('returns "error" when the local lookup fails, without calling OFF', async () => {
+    configureLookupSupabase(null, { message: 'boom' });
+    const fetchProductByBarcode = vi.fn();
+    TestBed.overrideProvider(FoodSearchOffService, { useValue: { fetchProductByBarcode } });
+
+    const result = await TestBed.inject(FoodSearchService).lookupBarcode('4008400123456');
+
+    expect(fetchProductByBarcode).not.toHaveBeenCalled();
+    expect(result).toEqual({ status: 'error', message: 'Food konnte nicht geladen werden.' });
   });
 });

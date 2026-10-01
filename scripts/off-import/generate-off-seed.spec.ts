@@ -67,11 +67,13 @@ describe('generate-off-seed (fixture .jsonl.gz, no network)', () => {
       '4006381333931', // 500 (Dublette mit mehr Scans ersetzt die erste)
       '4000000000017', // 9 (Gleichstand: zuerst gelesene bleibt)
       '7612345678901', // 7
+      '4000000000130', // 4 (Nährwerte aus nutrition.aggregated_set, per 100g)
       '0012345678905', // 0 (kJ-Produkt, 12-stelliger Rohcode -> kanonisch 13)
       '4000000000086', // 0 (Scans negativ)
       '4000000000093', // 0 (Scans gebrochen)
       '4000000000109', // 0 (Scans Text)
       '4000000000116', // 0 (kcal-Text -> kJ-Rückfall)
+      '4000000000154', // 0 (aggregated_set nur kJ)
     ]);
     expect(sql).toContain('2147483647::integer');
     expect(sql).toContain("'Naturjoghurt Dublette'");
@@ -79,20 +81,21 @@ describe('generate-off-seed (fixture .jsonl.gz, no network)', () => {
     expect(sql).toContain("'Gleichstand erste'");
     expect(sql).toContain("'L''Eau Zeile (d''Alsace)'");
     expect(sql).not.toContain('Gleichstand zweite');
-    expect(sql).toContain('Charge 1/1, 9 Zeilen');
+    expect(sql).toContain('Charge 1/1, 11 Zeilen');
   });
 
   it('reports statistics with every rejection reason', async () => {
     const { stdout } = await generate('stats');
     const text = stdout.join('\n');
-    expect(text).toMatch(/Zeilen gelesen:\s+20\b/);
+    expect(text).toMatch(/Zeilen gelesen:\s+24\b/);
     expect(text).toMatch(/nicht lesbar \(parse-error\):\s+1\b/);
     expect(text).toMatch(/kein DACH-Land:\s+1\b/);
     expect(text).toMatch(/kein Barcode:\s+1\b/);
     expect(text).toMatch(/kein Name:\s+1\b/);
-    expect(text).toMatch(/unvollständig:\s+1\b/);
+    expect(text).toMatch(/unvollständig:\s+3\b/);
+    expect(text).toMatch(/davon Nährwerte aus nutrition:\s+2\b/);
     expect(text).toMatch(/unplausibel:\s+3\b/);
-    expect(text).toMatch(/Geschrieben:\s+9 Produkte in 1 Chargen/);
+    expect(text).toMatch(/Geschrieben:\s+11 Produkte in 1 Chargen/);
   });
 
   it('is deterministic: same input gives byte-identical output', async () => {

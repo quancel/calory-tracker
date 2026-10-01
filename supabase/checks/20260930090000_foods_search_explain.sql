@@ -5,9 +5,10 @@
 -- Warum nicht `explain select * from search_foods(...)`: das zeigt nur einen
 -- "Function Scan" und beweist nichts über den Index. Geprüft wird deshalb das
 -- KANDIDATEN-PRÄDIKAT aus dem Funktionsrumpf von search_foods
--- (CTE params + where-Klausel). Es ist hier WORTGLEICH zum Funktionsrumpf in
+-- (CTEs params + hits). Es ist hier WORTGLEICH zum Funktionsrumpf in
 -- supabase/migrations/20260930090000_foods_search_trgm_popularity.sql
--- gehalten; nur p_query ist durch ein Literal ersetzt. Ändert sich eines von
+-- gehalten; nur p_query ist durch ein Literal ersetzt und die Select-Liste der
+-- Zweige auf f.id gekürzt (im Funktionsrumpf f.*). Ändert sich eines von
 -- beiden, muss das andere nachgezogen werden.
 --
 -- Lesehilfe:
@@ -37,15 +38,18 @@ with params as (
 select f.id
 from params p
 cross join public.foods f
-where p.len >= 2
+where p.len >= 3
+  and f.name ilike '%' || p.esc || '%'
+union all
+select f.id
+from params p
+cross join public.foods f
+where p.len = 2
   and (
-    (p.len >= 3 and f.name ilike '%' || p.esc || '%')
-    or (p.len = 2 and (
-      f.name ilike p.esc || '%'
-      or f.name ilike '% ' || p.esc || '%'
-      or f.name ilike '%(' || p.esc || '%'
-      or f.name ilike '%-' || p.esc || '%'
-    ))
+    f.name ilike p.esc || '%'
+    or f.name ilike '% ' || p.esc || '%'
+    or f.name ilike '%(' || p.esc || '%'
+    or f.name ilike '%-' || p.esc || '%'
   );
 
 -- A2: 'ei' (genau 2 Zeichen: nur Wortanfänge)
@@ -60,15 +64,18 @@ with params as (
 select f.id
 from params p
 cross join public.foods f
-where p.len >= 2
+where p.len >= 3
+  and f.name ilike '%' || p.esc || '%'
+union all
+select f.id
+from params p
+cross join public.foods f
+where p.len = 2
   and (
-    (p.len >= 3 and f.name ilike '%' || p.esc || '%')
-    or (p.len = 2 and (
-      f.name ilike p.esc || '%'
-      or f.name ilike '% ' || p.esc || '%'
-      or f.name ilike '%(' || p.esc || '%'
-      or f.name ilike '%-' || p.esc || '%'
-    ))
+    f.name ilike p.esc || '%'
+    or f.name ilike '% ' || p.esc || '%'
+    or f.name ilike '%(' || p.esc || '%'
+    or f.name ilike '%-' || p.esc || '%'
   );
 
 -- =========================================================================
@@ -90,15 +97,18 @@ with params as (
 select f.id
 from params p
 cross join public.foods f
-where p.len >= 2
+where p.len >= 3
+  and f.name ilike '%' || p.esc || '%'
+union all
+select f.id
+from params p
+cross join public.foods f
+where p.len = 2
   and (
-    (p.len >= 3 and f.name ilike '%' || p.esc || '%')
-    or (p.len = 2 and (
-      f.name ilike p.esc || '%'
-      or f.name ilike '% ' || p.esc || '%'
-      or f.name ilike '%(' || p.esc || '%'
-      or f.name ilike '%-' || p.esc || '%'
-    ))
+    f.name ilike p.esc || '%'
+    or f.name ilike '% ' || p.esc || '%'
+    or f.name ilike '%(' || p.esc || '%'
+    or f.name ilike '%-' || p.esc || '%'
   );
 
 -- B2: 'ei'
@@ -113,15 +123,18 @@ with params as (
 select f.id
 from params p
 cross join public.foods f
-where p.len >= 2
+where p.len >= 3
+  and f.name ilike '%' || p.esc || '%'
+union all
+select f.id
+from params p
+cross join public.foods f
+where p.len = 2
   and (
-    (p.len >= 3 and f.name ilike '%' || p.esc || '%')
-    or (p.len = 2 and (
-      f.name ilike p.esc || '%'
-      or f.name ilike '% ' || p.esc || '%'
-      or f.name ilike '%(' || p.esc || '%'
-      or f.name ilike '%-' || p.esc || '%'
-    ))
+    f.name ilike p.esc || '%'
+    or f.name ilike '% ' || p.esc || '%'
+    or f.name ilike '%(' || p.esc || '%'
+    or f.name ilike '%-' || p.esc || '%'
   );
 
 rollback;

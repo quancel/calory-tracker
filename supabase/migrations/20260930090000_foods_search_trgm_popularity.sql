@@ -52,7 +52,7 @@ create index if not exists foods_off_popularity_idx
 --     mit, 2 Wort beginnt mit, 3 Teilwort); own_use_count des AUFRUFERS
 --     (aus entries + RLS, zur Abfragezeit); off_popularity; name; id.
 --   * source null zählt als manuell (wie im Client).
--- Das Kandidaten-Prädikat (CTE params + where-Klausel) ist wortgleich in
+-- Das Kandidaten-Prädikat (CTEs params + hits) ist wortgleich in
 -- supabase/checks/20260930090000_foods_search_explain.sql zu halten.
 create or replace function public.search_foods(p_query text, p_limit integer default 20)
 returns table (
@@ -88,6 +88,31 @@ as $$
       and e.food_id is not null
     group by e.food_id
   ),
+  -- Kandidaten-Prädikat: zwei getrennte Zweige mit eigener Längenbedingung
+  -- (union all, nie ein einziges OR). Mit p_query als Parameter kennt der Planer
+  -- die Länge nicht; in einem OR würde der Zweig '%q%' auch bei 2 Zeichen in den
+  -- BitmapOr geraten und den Index vollständig lesen (gemessen: ~1,2 s statt
+  -- ~60 ms bei ~260k Zeilen). So gibt eine One-Time-Filter-Bedingung je Zweig
+  -- den nicht zutreffenden Zweig frei. (hits trägt die Zeilen selbst, kein Rück-Join
+  -- auf foods: der wurde als Hash Join über die ganze Tabelle geplant.)
+  hits as (
+    select f.*
+    from params p
+    cross join public.foods f
+    where p.len >= 3
+      and f.name ilike '%' || p.esc || '%'
+    union all
+    select f.*
+    from params p
+    cross join public.foods f
+    where p.len = 2
+      and (
+        f.name ilike p.esc || '%'
+        or f.name ilike '% ' || p.esc || '%'
+        or f.name ilike '%(' || p.esc || '%'
+        or f.name ilike '%-' || p.esc || '%'
+      )
+  ),
   cand as (
     select
       f.id, f.name, f.barcode, f.kcal_100g, f.protein_100g, f.carbs_100g,
@@ -103,19 +128,9 @@ as $$
           or f.name ilike '%-' || p.esc || '%' then 2
         else 3
       end as text_tier
-    from params p
-    cross join public.foods f
+    from hits f
+    cross join params p
     left join own o on o.food_id = f.id
-    where p.len >= 2
-      and (
-        (p.len >= 3 and f.name ilike '%' || p.esc || '%')
-        or (p.len = 2 and (
-          f.name ilike p.esc || '%'
-          or f.name ilike '% ' || p.esc || '%'
-          or f.name ilike '%(' || p.esc || '%'
-          or f.name ilike '%-' || p.esc || '%'
-        ))
-      )
   )
   select
     c.id, c.name, c.barcode, c.kcal_100g, c.protein_100g, c.carbs_100g,

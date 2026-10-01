@@ -7,6 +7,7 @@ import {
   chunkFileName,
   classifyOffRecord,
   composeName,
+  extractNutrientsPer100g,
   mightBeDach,
   planChunks,
   renderValueRow,
@@ -76,13 +77,15 @@ describe('toFiniteNumber / toPopularity', () => {
 
 describe('composeName', () => {
   it('prefers the German name and appends the first brand', () => {
-    expect(composeName({ product_name_de: 'Joghurt', product_name: 'Yogurt', brands: 'A, B' })).toBe(
-      'Joghurt (A)',
-    );
+    expect(
+      composeName({ product_name_de: 'Joghurt', product_name: 'Yogurt', brands: 'A, B' }),
+    ).toBe('Joghurt (A)');
   });
 
   it('falls back to the generic name and omits an empty brand', () => {
-    expect(composeName({ product_name_de: '  ', product_name: 'Yogurt', brands: '' })).toBe('Yogurt');
+    expect(composeName({ product_name_de: '  ', product_name: 'Yogurt', brands: '' })).toBe(
+      'Yogurt',
+    );
   });
 
   it('collapses whitespace and control characters', () => {
@@ -100,12 +103,15 @@ describe('classifyOffRecord', () => {
     expect(result).toEqual({
       kind: 'accepted',
       product: product({ barcode: '0012345678905', popularity: 10 }),
+      nutritionSource: 'nutriments',
     });
   });
 
   it('converts kJ to kcal through the shared normalization', () => {
     const result = classifyOffRecord(
-      record({ nutriments: { energy_100g: 184, proteins_100g: 1, carbohydrates_100g: 6.5, fat_100g: 1.5 } }),
+      record({
+        nutriments: { energy_100g: 184, proteins_100g: 1, carbohydrates_100g: 6.5, fat_100g: 1.5 },
+      }),
     );
     expect(result.kind).toBe('accepted');
     if (result.kind === 'accepted') expect(result.product.kcal100g).toBe(43.98);
@@ -151,24 +157,43 @@ describe('classifyOffRecord', () => {
 
   it('classifies a negative raw value as implausible, not as missing', () => {
     const result = classifyOffRecord(
-      record({ nutriments: { 'energy-kcal_100g': 100, proteins_100g: -5, carbohydrates_100g: 10, fat_100g: 5 } }),
+      record({
+        nutriments: {
+          'energy-kcal_100g': 100,
+          proteins_100g: -5,
+          carbohydrates_100g: 10,
+          fat_100g: 5,
+        },
+      }),
     );
     expect(result).toEqual({ kind: 'rejected', reason: 'implausible' });
   });
 
   it('classifies a negative energy value that would be used as implausible', () => {
     const result = classifyOffRecord(
-      record({ nutriments: { energy_100g: -184, proteins_100g: 1, carbohydrates_100g: 6, fat_100g: 1 } }),
+      record({
+        nutriments: { energy_100g: -184, proteins_100g: 1, carbohydrates_100g: 6, fat_100g: 1 },
+      }),
     );
     expect(result).toEqual({ kind: 'rejected', reason: 'implausible' });
   });
 
   it('rejects kcal deviating more than the shared threshold and macro sums over 100 g', () => {
     const deviating = record({
-      nutriments: { 'energy-kcal_100g': 900, proteins_100g: 5, carbohydrates_100g: 10, fat_100g: 5 },
+      nutriments: {
+        'energy-kcal_100g': 900,
+        proteins_100g: 5,
+        carbohydrates_100g: 10,
+        fat_100g: 5,
+      },
     });
     const overfull = record({
-      nutriments: { 'energy-kcal_100g': 900, proteins_100g: 60, carbohydrates_100g: 60, fat_100g: 10 },
+      nutriments: {
+        'energy-kcal_100g': 900,
+        proteins_100g: 60,
+        carbohydrates_100g: 60,
+        fat_100g: 10,
+      },
     });
     expect(classifyOffRecord(deviating)).toEqual({ kind: 'rejected', reason: 'implausible' });
     expect(classifyOffRecord(overfull)).toEqual({ kind: 'rejected', reason: 'implausible' });
@@ -244,9 +269,13 @@ describe('SQL rendering', () => {
     expect(sql.match(/^begin;$/gm)).toHaveLength(1);
     expect(sql.match(/^commit;$/gm)).toHaveLength(1);
     expect(sql).toContain("set local statement_timeout = '10min';");
-    expect(sql).toContain('where not exists (select 1 from public.foods f where f.barcode = any(v.keys))');
+    expect(sql).toContain(
+      'where not exists (select 1 from public.foods f where f.barcode = any(v.keys))',
+    );
     expect(sql).toContain('on conflict (barcode) do nothing');
-    expect(sql).toContain('where f.barcode = any(v.keys) and f.off_popularity <> v.off_popularity;');
+    expect(sql).toContain(
+      'where f.barcode = any(v.keys) and f.off_popularity <> v.off_popularity;',
+    );
     expect(sql.match(/\binsert into\b/g)).toHaveLength(1);
     expect(sql.match(/\bupdate public\.foods\b/g)).toHaveLength(1);
     expect(sql).not.toMatch(/\b(create|drop|alter|truncate)\b/i);
@@ -255,5 +284,63 @@ describe('SQL rendering', () => {
   it('names chunk files with four digits', () => {
     expect(chunkFileName(1)).toBe('off-dach-0001.sql');
     expect(chunkFileName(123)).toBe('off-dach-0123.sql');
+  });
+});
+
+describe('extractNutrientsPer100g', () => {
+  const aggregated = (per: string, nutrients: Record<string, unknown>) => ({
+    nutriments: {},
+    nutrition: { aggregated_set: { per, nutrients } },
+  });
+  const full = {
+    'energy-kcal': { value: 110, unit: 'kcal' },
+    proteins: { value: 5, unit: 'g' },
+    carbohydrates: { value: 10, unit: 'g' },
+    fat: { value: 5.5, unit: 'g' },
+  };
+
+  it('prefers legacy nutriments when they carry any value', () => {
+    const raw = { ...aggregated('100g', full), nutriments: { proteins_100g: 7 } };
+    const { values, source } = extractNutrientsPer100g(raw);
+    expect(source).toBe('nutriments');
+    expect(values.protein).toBe(7);
+    expect(values.carbs).toBeUndefined();
+  });
+
+  it('falls back to nutrition.aggregated_set per 100g when nutriments is empty', () => {
+    const { values, source } = extractNutrientsPer100g(aggregated('100g', full));
+    expect(source).toBe('nutrition');
+    expect(values).toEqual({ kcal: 110, kj: undefined, protein: 5, carbs: 10, fat: 5.5 });
+  });
+
+  it('reads kJ from energy-kj or energy only with unit kJ', () => {
+    expect(
+      extractNutrientsPer100g(aggregated('100g', { 'energy-kj': { value: 184, unit: 'kJ' } }))
+        .values.kj,
+    ).toBe(184);
+    expect(
+      extractNutrientsPer100g(aggregated('100g', { energy: { value: 184, unit: 'kcal' } })).values
+        .kj,
+    ).toBeUndefined();
+  });
+
+  it('ignores per 100ml, wrong units and a missing nutrition object', () => {
+    expect(extractNutrientsPer100g(aggregated('100ml', full)).values.kcal).toBeUndefined();
+    expect(
+      extractNutrientsPer100g(aggregated('100g', { proteins: { value: 5000, unit: 'mg' } })).values
+        .protein,
+    ).toBeUndefined();
+    expect(extractNutrientsPer100g({ nutriments: {} }).values.fat).toBeUndefined();
+  });
+
+  it('classifies an aggregated-set product as accepted with source nutrition', () => {
+    const result = classifyOffRecord({
+      code: '4006381333931',
+      product_name: 'Joghurt',
+      countries_tags: ['en:germany'],
+      ...aggregated('100g', { ...full, 'energy-kcal': { value: 110, unit: 'kcal' } }),
+    });
+    expect(result.kind).toBe('accepted');
+    if (result.kind === 'accepted') expect(result.nutritionSource).toBe('nutrition');
   });
 });

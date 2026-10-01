@@ -92,6 +92,7 @@ async function readProducts(
       continue;
     }
     stats.accepted++;
+    if (result.nutritionSource === 'nutrition') stats.acceptedFromNutrition++;
     const outcome = addProduct(collected, result.product);
     if (outcome === 'replaced') stats.replacedDuplicates++;
     else if (outcome === 'duplicate') stats.droppedDuplicates++;
