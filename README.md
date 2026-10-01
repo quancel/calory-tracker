@@ -239,11 +239,13 @@ bis auf `off_popularity` unverändert; Dubletten entstehen nicht. Nach einem
 Abbruch genügt es, die Schleife erneut zu starten. Alternativ lässt sich eine
 Datei im Supabase-SQL-Editor ausführen (jede Datei ist wenige MB groß).
 
-**Speicherbedarf (Schätzung, nicht gemessen).** Bei ~300.000 Zeilen etwa
-55 MB Tabelle, 40 MB Trigram-Index und 25 MB übrige Indizes, zusammen rund
-120 MB von 500 MB im Free Plan. Das tatsächliche Ergebnis prüfst du nach dem
-Import mit den Größenabfragen aus `supabase/checks/20260930090000_foods_search_explain.sql`
-oder direkt:
+**Speicherbedarf.** Gemessen in einem lokalen Postgres 16 mit den 261.399
+Produkten des ersten Vollimports (vor der 100-ml-Ergänzung): 36 MB Tabelle,
+25 MB Trigram-Index, 59 MB Indizes insgesamt. Mit den geschätzt 280.000 bis
+290.000 Zeilen seit der 100-ml-Regel sind es entsprechend etwas mehr, deutlich
+unter den 500 MB im Free Plan (Supabase selbst nicht gemessen). Das tatsächliche
+Ergebnis prüfst du nach dem Import mit den Größenabfragen aus
+`supabase/checks/20260930090000_foods_search_explain.sql` oder direkt:
 
 ```sql
 select count(*) as zeilen, count(*) filter (where off_popularity > 0) as mit_scans

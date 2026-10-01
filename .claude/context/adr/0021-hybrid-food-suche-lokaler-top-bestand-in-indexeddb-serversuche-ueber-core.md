@@ -141,6 +141,31 @@ in `meals.store.ts` eine eigene Kopie der Filterlogik.
     Nutzer (Step A, M2). Kein Fehlerblock mehr für den Lokalbestand in
     beiden Sheets.
 
+## Nachtrag 2026-10-01 — nach Umsetzung und Abnahme (PO-2026-09-30-003)
+
+- **Zu Punkt 11, Rang (vom Nutzer bestätigt)**: manuell/korrigiert →
+  Textübereinstimmung (Stufe 0–3) → eigene Nutzung → OFF-Beliebtheit →
+  Name → `id`. Textübereinstimmung steht also **vor** eigener Nutzung.
+- **Zu Punkt 11, Kürzung lokal**: Die lokale Gruppe wird nach dem Rang auf
+  `LOCAL_RESULT_LIMIT = 50` gekürzt (Nutzerentscheidung; ohne Grenze
+  wurden bei 5.000 lokalen Foods 4.998 Zeilen gerendert, ~666 ms).
+  `limitLocalResults` liegt in `core/foods.calculations.ts` und wird nur in
+  `createHybridFoodSearch()` angewendet. Der Server-Abzug von Duplikaten
+  läuft gegen den **ungekürzten** lokalen Satz. Step A und M2 kürzen nie
+  selbst.
+- **Zu Punkt 12, Konstanten**: `core/food-search.constants.ts` führt fünf
+  Produktwerte, je genau einmal: `LOCAL_TOP_N = 5000`, `SERVER_RESULT_LIMIT
+  = 20`, `MIN_SERVER_QUERY_LENGTH = 2`, `LOCAL_RESULT_LIMIT = 50`,
+  `RECENT_FOODS_LIMIT = 10`.
+- **Zu Punkt 13 / M2**: Der Retry-Button der Statuszeile ist in
+  `--color-text` gesetzt. M2 zeigt bei leerer Suche „Zuletzt verwendet";
+  `selectRecentFoods` liegt dafür jetzt in `core/foods.calculations.ts`
+  (zweiter Nutzer).
+- **Zu Punkt 6/8**: `CoreFoodsService` hat ein Signal `initialLoading`; die
+  Lade-/Fehlerzustände der Feature-Stores (`loading`, `loadError`,
+  `retryLoad`) sind entfallen. Server-Treffer werden bei der Auswahl und vor
+  Step C per `upsertFood()` übernommen, gescannte Foods immer.
+
 ## Verhältnis zu bestehenden ADRs
 
 - **ADR-0008 Punkt 3 / ADR-0012 Punkt 1**: abgelöst ist die Lade-Strategie

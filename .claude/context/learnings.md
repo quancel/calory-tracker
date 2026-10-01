@@ -41,3 +41,32 @@ Arbeitspakets, ob ein Learning wiederkehrend relevant ist, und fasst es in
   Abschnitte prüfen (nicht nur gegen die Kernlogik) und zusätzlich, ob zu
   jeder neuen Datei die `*.spec.ts` existiert. (task_id:
   PO-2026-09-20-015-fe)
+- [2026-10-01] `data-platform`: Ohne Supabase-Instanz lassen sich Migrationen
+  und SQL-Funktionen gegen ein lokales Postgres 16 prüfen (`initdb` unter
+  `/var/tmp`, Stubs für `anon`/`authenticated`, `auth.uid()` und das Schema
+  `extensions`). Ungeprüft bleiben echte RLS-Rollen, PostgREST (`max_rows`,
+  `.range` auf `rpc`) und Nutzerwechsel; Backend-Pakete sollen das im
+  Handoff als ungeprüft ausweisen. (task_id: PO-2026-09-30-001)
+- [2026-10-01] `data-platform`: In `language sql`-Funktionen kennt der Planer
+  die Eingabelänge nicht. Ein `or` über längenabhängige Fälle kann einen
+  Index komplett abarbeiten lassen (1,2 s gegenüber 9–24 ms mit `union
+  all`). Pakete mit neuer Such-RPC brauchen deshalb einen `explain` je Zweig
+  mit realistischem Datenbestand als Constraint. (task_id: PO-2026-09-30-001)
+- [2026-10-01] `projektweit`: Annahmen über externe Datenformate (OFF-Export)
+  beim Einordnen als **ungeprüft** markieren und eine Prüfung an einer
+  echten Stichprobe als ersten Schritt des Leads vorgeben. Hier lagen die
+  Nährwerte nicht in `nutriments`, ohne Rückfall wären es 56 statt 261k
+  Produkte geworden. (task_id: PO-2026-09-30-002-be)
+- [2026-10-01] `projektweit`: Akzeptanzkriterien mit absoluten Wörtern
+  („alle", „nur", „unverändert") haben dreimal Abnahme-Rückfragen ausgelöst,
+  weil ein ADR eine Ausnahme vorsah (z. B. Update von `off_popularity`).
+  Beim Einordnen solche Kriterien gegen die ADRs gegenlesen und die
+  Ausnahme als `constraint` ausschreiben. (task_id: PO-2026-09-30-002/-003)
+- [2026-10-01] `food-catalog`: Lokale Trefferlisten ohne Obergrenze werden
+  bei großem lokalem Bestand zum Render-Problem (4.998 Zeilen, ~666 ms).
+  Pakete, die einen lokalen Bestand vergrößern, brauchen eine
+  Anzeigegrenze als Produktwert. (task_id: PO-2026-09-30-003)
+- [2026-10-01] `projektweit`: In der Agent-Umgebung meldet `ng` eine zu alte
+  Node-Version (22.22.2 < 22.22.3). Abhilfe ist ein Wrapper im Scratchpad,
+  der `process.version` überschreibt; im Repo wird dafür nichts geändert.
+  (task_id: PO-2026-09-30-003)

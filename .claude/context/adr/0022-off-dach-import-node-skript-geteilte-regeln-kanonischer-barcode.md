@@ -1,6 +1,6 @@
 # ADR-0022: DACH-Import aus dem OFF-Bulk-Export — Node-Skript unter `scripts/off-import/` ohne Laufzeit-Abhängigkeit, geteilte reine Regeln aus `src/app`, kanonische Barcode-Form für Import **und** Scan, Chargen als reine DML
 
-- **Status**: accepted (Punkt 7 — erzeugte Chargen nicht committet — steht unter Vorbehalt der Nutzerfrage aus `PO-2026-09-30-002`; Ergänzung zu ADR-0010 Punkt 4, siehe „Verhältnis zu bestehenden ADRs")
+- **Status**: accepted (Punkt 7 — erzeugte Chargen nicht committet — und Punkt 5 — `off_popularity`-Aktualisierung bei bestehenden Foods — sind vom Nutzer bestätigt; Ergänzung zu ADR-0010 Punkt 4, siehe „Verhältnis zu bestehenden ADRs")
 - **Datum**: 2026-10-01
 - **Bounded Context(s)**: `data-platform` (wirkt auf `food-catalog`)
 - **task_id**: `PO-2026-09-30-002` (Teilpakete `-be` Skript/Regeln/README, `-fe` Scan-Lookup)
@@ -96,8 +96,7 @@ schreibt, kann deshalb nicht zusichern, dass ein Scan ihn findet.
    Barcode asc; aufgeteilt in Chargen fester Zeilenzahl. Gleiche Eingabe ⇒
    byte-gleiche Dateien (kein Zeitstempel im Inhalt). Die ersten Chargen
    tragen damit den Top-Bestand aus ADR-0021.
-7. **Erzeugte Chargen werden nicht committet** (unter Vorbehalt, siehe
-   Status): Ausgabeort `supabase/data/off-dach/`, per `.gitignore`
+7. **Erzeugte Chargen werden nicht committet** (Nutzerentscheidung): Ausgabeort `supabase/data/off-dach/`, per `.gitignore`
    ausgeschlossen; committet werden Skript, Tests und README-Anleitung.
    Gründe: ~30–60 MB SQL je OFF-Stand wachsen bei jeder Neuerzeugung
    dauerhaft in die Git-Historie; eine öffentlich veröffentlichte, abgeleitete
@@ -195,4 +194,4 @@ Schätzung aus ADR-0020 (~120 MB) war zu hoch (siehe Nachtrag dort).
 - **Bestehende Barcodes per Migration auf die kanonische Form umschreiben** —
   verworfen: schreibt Zeilen mit `is_corrected = true` (ADR-0011 Punkt 7);
   die Lookup-Schlüssel decken die Altform ab.
-- **Chargen committen** — siehe Punkt 7; Nutzerfrage offen.
+- **Chargen committen** — vom Nutzer abgelehnt (Punkt 7).

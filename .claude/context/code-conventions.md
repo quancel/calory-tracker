@@ -4,7 +4,9 @@
 liefern Vorschläge über `notes_for_conventions` im Handoff.
 
 - **Modus**: `vorgegeben` (Greenfield, festgelegt in ADR-0001)
-- **Zuletzt geprüft**: 2026-10-01 (Abschnitt „Werkzeuge (`scripts/`)",
+- **Zuletzt geprüft**: 2026-10-01 (Nachpflege nach Abnahme von
+  PO-2026-09-30-001/-002/-003: Such-Konstanten, Tests, Migrations-Ausnahme,
+  Werkzeug-Regeln; davor Abschnitt „Werkzeuge (`scripts/`)",
   Barcode-Regel, `supabase/data/`, Paket PO-2026-09-30-002, ADR-0022; davor
   2026-09-30 Foods-Lesepfad, Offline-Lesecache,
   Such-Konstanten, `core/`-Factory und Statuszeile für die Hybrid-Suche,
@@ -101,6 +103,15 @@ src/
   **Reihenfolge** auf: erst `TestBed.inject(LocalDbService).close()`, dann
   `indexedDB.deleteDatabase(...)`. Umgekehrt blockiert die noch offene
   Verbindung das Löschen, und der nächste Test läuft auf altem Bestand.
+- `fake-indexeddb` klont große Objektmengen sehr langsam: Reine
+  Paging-/Lade-Tests mit Tausenden Foods überspringen
+  `LocalDbService.put` per `vi.spyOn(...)`; die Persistenz wird in eigenen,
+  kleinen Tests geprüft.
+- Barcodes in Lookup-Tests sind echte 8-/12-/13-stellige Codes —
+  `normalizeBarcode` füllt Kurzwerte auf (`'123'` → `'00000123'`), und ein
+  Test mit Fantasiecode prüft dann nicht, was er zu prüfen scheint.
+- Angular-Specs (TestBed) laufen nur über `ng test --watch=false [--include
+  <spec>]`, nie über nacktes `vitest run`.
 - Tests, die einen gepufferten Schreibvorgang auslösen, warten den
   Hintergrund-Sync explizit ab (`await
   TestBed.inject(EntrySyncService).runQueue()` als Drain), statt sich auf
@@ -288,8 +299,12 @@ src/
   Lesen des gespeicherten Bestands ab, statt sich auf `foods()` zum
   Aufrufzeitpunkt zu verlassen (ADR-0021 Punkt 6/8).
 - Produktwerte der Food-Suche (`LOCAL_TOP_N`, `SERVER_RESULT_LIMIT`,
-  `MIN_SERVER_QUERY_LENGTH`): ausschließlich
-  `src/app/core/food-search.constants.ts`. Technische Werte (Debounce,
+  `MIN_SERVER_QUERY_LENGTH`, `LOCAL_RESULT_LIMIT`, `RECENT_FOODS_LIMIT`):
+  ausschließlich `src/app/core/food-search.constants.ts`, je genau einmal.
+  Gekürzt wird die lokale Gruppe nur in `createHybridFoodSearch()` (über
+  `limitLocalResults` aus `core/foods.calculations.ts`), und zwar **nach**
+  dem Abzug der Server-Duplikate gegen den ungekürzten lokalen Satz. Step A
+  und M2 kürzen nie selbst (ADR-0021 Nachtrag). Technische Werte (Debounce,
   Zeitlimit, Seitengröße, Fingerabdruck-Größe, RPC-Abfragelimit,
   Snapshot-Schema) als exportierte Konstante in der Datei, die sie nutzt
   (`hybrid-food-search.ts` bzw. `foods.service.ts`).
@@ -416,6 +431,10 @@ supabase/
   die Tabelle, nie nachträglich „später".
 - Migrationen sind **additiv und unveränderlich**: eine bereits committete
   Migration wird nie editiert, Korrekturen kommen als neue Migration.
+  Einzige Ausnahme: Der Nutzer hat **ausdrücklich bestätigt**, dass die
+  Datei noch nirgends eingespielt ist. Dann darf sie editiert werden, und
+  der Lead vermerkt das im Handoff. Ohne diese Bestätigung gilt die Regel
+  auch innerhalb eines laufenden Abnahme-Fixes.
 - Dateiname mit UTC-Zeitstempel `<YYYYMMDDHHMMSS>_<beschreibung>.sql`; der
   Inhalt ist wiederholbar einspielbar (`if not exists`,
   `drop policy if exists` vor `create policy`). Keine Supabase-CLI als
@@ -494,6 +513,17 @@ scripts/
   `*.constants.ts` importiert — nie Dienste, Stores, Komponenten, nie etwas
   mit Angular-/Supabase-Laufzeitimport; Regeln werden importiert, nie
   kopiert. `src/app` importiert nie aus `scripts/`.
+- Der Einstieg exportiert `run(argv, print)` und startet nur, wenn
+  `process.argv[1]` die eigene Datei ist — so ist er im End-to-End-Test
+  aufrufbar, ohne zu starten. Specs importieren `describe`/`it`/`expect`
+  ausdrücklich aus `'vitest'` (keine Globals). npm-Skripte rufen Node mit
+  `--disable-warning=ExperimentalWarning` und
+  `--disable-warning=MODULE_TYPELESS_PACKAGE_JSON` auf.
+- Typ-Importe aus `src/app`, die über gitignorierte Dateien laufen (z. B.
+  `environment.ts`), werden im Werkzeug-`tsconfig.json` über `stubs/` +
+  `rootDirs` aufgelöst, nicht durch Anlegen der ignorierten Datei.
+- Ein Werkzeug löscht im Ausgabeordner nur Dateien nach seinem eigenen
+  Namensmuster, nie den ganzen Ordner.
 - Weicht die Form einer externen Quelle von der Rohform ab, die eine
   geteilte Regel erwartet (z. B. OFF `nutrition.aggregated_set` statt
   `nutriments.*_100g`), bildet das Werkzeug sie **auf diese Rohform ab** und

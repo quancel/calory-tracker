@@ -69,7 +69,8 @@ Basis-Migration **nullable** (der Client liest `null` als `'manual'`,
    - Eingabe: `trim(p_query)`, auf 100 Zeichen gekürzt; `%`, `_`, `\` werden
      für `LIKE` escaped. Leer, nur Leerzeichen, `null` oder **kürzer als 2
      Zeichen** → leere Menge, kein Fehler. `p_limit` `null` → 20, geklemmt
-     auf 1..50.
+     auf 1..50 (präzisiert im Nachtrag 2026-10-01: `p_limit <= 0` → leere
+     Menge statt Klemmung auf 1).
    - Kandidaten, **ab 3 Zeichen**: `name ilike '%' || q || '%'` (Teilwort,
      case-insensitiv, trigram-indexgestützt).
      **Bei genau 2 Zeichen**: nur Wortanfänge — `name ilike q || '%'` oder
@@ -137,6 +138,12 @@ werden Umsetzungsregel und Messwerte.
   mit getrennten Zweigen 9–24 ms. Ein künftiger Umbau, der die Zweige
   wieder zu einem `or` zusammenfasst, ist eine Regression. Die Prüfdatei
   (Punkt 6) prüft die Prädikate beider Zweige wortgleich.
+- **Zu Punkt 4, Rück-Join vermeiden**: Die Kandidaten-CTE trägt die
+  Rückgabespalten selbst. Ein Rück-Join der Kandidaten-IDs auf `foods` wurde
+  vom Planer zum Hash Join über die ganze Tabelle.
+- **Zu Punkt 4, `p_limit`**: `null` → 20, `<= 0` → leere Menge, Obergrenze
+  50 (umgesetzt und abgenommen; ersetzt „geklemmt auf 1..50" für die
+  Untergrenze).
 - **Zu Punkt 5**: `top_foods(null)` liefert 0 Zeilen (`limit
   greatest(null, 0)` → `limit 0`); bestätigt, kein Fehler.
 - **Speicher (korrigiert die Schätzung unter „Konsequenzen")**: gemessen
