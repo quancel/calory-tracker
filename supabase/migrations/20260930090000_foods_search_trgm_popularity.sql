@@ -46,6 +46,7 @@ create index if not exists foods_off_popularity_idx
 -- search_foods: Teilwort-Suche mit Rang (ADR-0020 Punkt 4).
 --   * Eingabe: trim, auf 100 Zeichen gekürzt, %, _, \ für LIKE escaped.
 --     Kürzer als 2 Zeichen, leer oder null -> leere Menge.
+--   * p_limit: null -> 20, <= 0 -> leere Menge, Obergrenze 50.
 --   * Ab 3 Zeichen Teilwort (ilike '%q%'); bei genau 2 Zeichen nur
 --     Wortanfänge (sonst liefert pg_trgm kein Trigramm -> Seq-Scan).
 --   * Rang: manuell/korrigiert vor OFF; text_tier (0 gleich, 1 Name beginnt
@@ -144,7 +145,7 @@ as $$
     c.off_popularity desc,
     c.name asc,
     c.id asc
-  limit least(greatest(coalesce(p_limit, 20), 1), 50)
+  limit least(greatest(coalesce(p_limit, 20), 0), 50)
 $$;
 
 -- top_foods: die p_limit beliebtesten Foods (nutzerunabhängig, ADR-0020

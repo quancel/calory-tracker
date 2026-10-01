@@ -7,6 +7,9 @@ import {
   chunkFileName,
   classifyOffRecord,
   composeName,
+  createStats,
+  dachCountries,
+  formatStats,
   extractNutrientsPer100g,
   mightBeDach,
   planChunks,
@@ -42,6 +45,8 @@ function product(overrides: Partial<ImportProduct> = {}): ImportProduct {
     carbsG100g: 10,
     fatG100g: 5.5,
     popularity: 10,
+    countries: ['DE'],
+    germanName: false,
     ...overrides,
   };
 }
@@ -353,5 +358,34 @@ describe('extractNutrientsPer100g', () => {
     });
     expect(result.kind).toBe('accepted');
     if (result.kind === 'accepted') expect(result.nutritionSource).toBe('nutrition');
+  });
+});
+
+describe('country and German-name statistics', () => {
+  it('lists DACH countries of a product in fixed order', () => {
+    expect(
+      dachCountries({ countries_tags: ['en:switzerland', 'en:france', 'en:germany'] }),
+    ).toEqual(['DE', 'CH']);
+    expect(dachCountries({})).toEqual([]);
+  });
+
+  it('marks germanName only when product_name_de is used', () => {
+    const withDe = classifyOffRecord(record({ product_name_de: 'Joghurt' }));
+    const without = classifyOffRecord(record({ product_name_de: ' ' }));
+    expect(withDe.kind === 'accepted' && withDe.product.germanName).toBe(true);
+    expect(without.kind === 'accepted' && without.product.germanName).toBe(false);
+  });
+
+  it('prints hits per country and rows without German name', () => {
+    const products = [
+      product({ barcode: '1', countries: ['DE', 'AT'], germanName: true }),
+      product({ barcode: '2', countries: ['CH'], germanName: false }),
+      product({ barcode: '3', countries: ['DE'], germanName: false }),
+    ];
+    const text = formatStats(createStats(), { products, chunkCount: 1, largestChunkBytes: 1 }).join(
+      '\n',
+    );
+    expect(text).toMatch(/Treffer je Land \(Produkt kann in mehreren zählen\): DE 2, AT 1, CH 1/);
+    expect(text).toMatch(/davon ohne deutschen Namen:\s+2 /);
   });
 });

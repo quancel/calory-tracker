@@ -33,6 +33,13 @@ export const OFF_STATEMENT_TIMEOUT = '10min';
 /** Länder des DACH-Imports als OFF-`countries_tags`. */
 export const DACH_COUNTRY_TAGS: readonly string[] = ['en:germany', 'en:austria', 'en:switzerland'];
 
+export type DachCountry = 'DE' | 'AT' | 'CH';
+const COUNTRY_BY_TAG: Readonly<Record<string, DachCountry>> = {
+  'en:germany': 'DE',
+  'en:austria': 'AT',
+  'en:switzerland': 'CH',
+};
+
 /** Ablehnungsgründe in Prüfreihenfolge (erste zutreffende Stufe gewinnt). */
 export const REJECT_REASONS = [
   'parse-error',
@@ -55,6 +62,10 @@ export interface ImportProduct {
   readonly fatG100g: number;
   /** OFF `unique_scans_n`; fehlt es → 0, nie konstant (ADR-0020 Punkt 2). */
   readonly popularity: number;
+  /** DACH-Länder aus `countries_tags` (ein Produkt kann in mehreren stehen). */
+  readonly countries: readonly DachCountry[];
+  /** Name beruht auf `product_name_de` (sonst auf `product_name`). */
+  readonly germanName: boolean;
 }
 
 /** Woher die Nährwerte stammen: Legacy-`nutriments` (`*_100g`) oder `nutrition.aggregated_set` (per 100g). */
@@ -109,6 +120,18 @@ export function composeName(raw: Record<string, unknown>): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** DACH-Länder eines Produkts in fester Reihenfolge DE, AT, CH. */
+export function dachCountries(raw: Record<string, unknown>): DachCountry[] {
+  const tags = raw['countries_tags'];
+  if (!Array.isArray(tags)) return [];
+  const found = new Set<DachCountry>();
+  for (const tag of tags) {
+    const country = typeof tag === 'string' ? COUNTRY_BY_TAG[tag] : undefined;
+    if (country !== undefined) found.add(country);
+  }
+  return (['DE', 'AT', 'CH'] as const).filter((country) => found.has(country));
 }
 
 function isDach(raw: Record<string, unknown>): boolean {
@@ -258,6 +281,8 @@ export function classifyOffRecord(raw: unknown): Classification {
       carbsG100g: product.carbsG100g,
       fatG100g: product.fatG100g,
       popularity: toPopularity(raw['unique_scans_n']),
+      countries: dachCountries(raw),
+      germanName: cleanText(raw['product_name_de']) !== '',
     },
     nutritionSource,
   };
@@ -445,6 +470,11 @@ export function formatStats(stats: ImportStats, output: OutputSummary): string[]
     stats.rejected['incomplete'] +
     stats.rejected['implausible'];
   const withScans = output.products.filter((product) => product.popularity > 0).length;
+  const perCountry: Record<DachCountry, number> = { DE: 0, AT: 0, CH: 0 };
+  for (const product of output.products) {
+    for (const country of product.countries) perCountry[country]++;
+  }
+  const withoutGermanName = output.products.filter((product) => !product.germanName).length;
   const lines = [
     `Zeilen gelesen:                 ${stats.linesRead}`,
     `  per Vorfilter übersprungen:   ${stats.prefiltered}`,
@@ -459,6 +489,8 @@ export function formatStats(stats: ImportStats, output: OutputSummary): string[]
     `    davon Nährwerte aus nutrition:  ${stats.acceptedFromNutrition + stats.acceptedFrom100ml} (je 100 ml, wie 100 g behandelt: ${stats.acceptedFrom100ml})`,
     `  Dubletten (gleicher Barcode): ${stats.replacedDuplicates + stats.droppedDuplicates} (${stats.replacedDuplicates} ersetzt, ${stats.droppedDuplicates} verworfen)`,
     `Geschrieben:                    ${output.products.length} Produkte in ${output.chunkCount} Chargen`,
+    `  Treffer je Land (Produkt kann in mehreren zählen): DE ${perCountry.DE}, AT ${perCountry.AT}, CH ${perCountry.CH}`,
+    `  davon ohne deutschen Namen:   ${withoutGermanName} (${percent(withoutGermanName, output.products.length)})`,
     `  mit unique_scans_n > 0:       ${withScans} (${percent(withScans, output.products.length)})`,
     `  höchste Beliebtheit:          ${output.products[0]?.popularity ?? '-'}`,
     `  größte Charge:                ${(output.largestChunkBytes / 1024 / 1024).toFixed(2)} MB`,

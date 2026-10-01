@@ -156,6 +156,12 @@ select (select count(*) from public.search_foods('e')) as ein_zeichen,
        (select count(*) from public.search_foods(null)) as null_eingabe,
        (select count(*) from public.search_foods('%%%')) as platzhalter;
 
+-- p_limit: 0 und negativ -> 0 Zeilen, null -> höchstens 20, 999 -> höchstens 50.
+select (select count(*) from public.search_foods('jo', 0)) as limit_0,
+       (select count(*) from public.search_foods('jo', -1)) as limit_minus_1,
+       (select count(*) from public.search_foods('jo', null)) as limit_null,
+       (select count(*) from public.search_foods('jo', 999)) as limit_999;
+
 -- top_foods: nach off_popularity absteigend, id aufsteigend.
 select name, off_popularity from public.top_foods(5);
 

@@ -98,6 +98,8 @@ describe('generate-off-seed (fixture .jsonl.gz, no network)', () => {
       /davon Nährwerte aus nutrition:\s+3 \(je 100 ml, wie 100 g behandelt: 1\)/,
     );
     expect(text).toMatch(/unplausibel:\s+3\b/);
+    expect(text).toMatch(/Treffer je Land \(Produkt kann in mehreren zählen\): DE 7, AT 4, CH 1/);
+    expect(text).toMatch(/davon ohne deutschen Namen:\s+10 /);
     expect(text).toMatch(/Geschrieben:\s+12 Produkte in 1 Chargen/);
   });
 
