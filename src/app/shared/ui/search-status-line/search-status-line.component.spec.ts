@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import type { SearchStatus } from '../../../core/foods.calculations';
-import { SearchStatusLineComponent } from './search-status-line.component';
+import { SEARCHING_TEXT_DELAY_MS, SearchStatusLineComponent } from './search-status-line.component';
 
 describe('SearchStatusLineComponent (ADR-0021 Punkt 13)', () => {
   function render(inputs: {
@@ -53,8 +53,12 @@ describe('SearchStatusLineComponent (ADR-0021 Punkt 13)', () => {
     expect(fixture.nativeElement.querySelector('button')).toBeTruthy();
   });
 
-  it('searching: text only, without icon, spinner or button', () => {
+  it('searching: text only, without icon, spinner or button, set only after the delay', async () => {
+    vi.useFakeTimers();
     const fixture = render({ status: { kind: 'searching' } });
+    await vi.advanceTimersByTimeAsync(SEARCHING_TEXT_DELAY_MS);
+    fixture.detectChanges();
+    vi.useRealTimers();
 
     expect(live(fixture).textContent).toContain('Suche online …');
     expect(fixture.nativeElement.querySelector('svg')).toBeNull();
@@ -85,5 +89,54 @@ describe('SearchStatusLineComponent (ADR-0021 Punkt 13)', () => {
     expect(live(render({ reserveSpace: true })).classList.contains('status-line-reserved')).toBe(
       true,
     );
+  });
+
+  describe('Verzögerung von „Suche online …"', () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    it('never puts the text into the live region when the answer comes before 300 ms', async () => {
+      const fixture = render({ status: { kind: 'searching' } });
+      await vi.advanceTimersByTimeAsync(SEARCHING_TEXT_DELAY_MS - 50);
+      fixture.detectChanges();
+      expect(live(fixture).textContent).not.toContain('Suche online');
+
+      fixture.componentRef.setInput('status', { kind: 'none' });
+      fixture.detectChanges();
+      await vi.advanceTimersByTimeAsync(SEARCHING_TEXT_DELAY_MS * 2);
+      fixture.detectChanges();
+
+      expect(live(fixture).textContent).not.toContain('Suche online');
+      expect(live(fixture)).toBeTruthy(); // Live-Region bleibt im DOM
+    });
+
+    it('sets the text after 300 ms without an answer and removes it when the state changes', async () => {
+      const fixture = render({ status: { kind: 'searching' } });
+
+      await vi.advanceTimersByTimeAsync(SEARCHING_TEXT_DELAY_MS);
+      fixture.detectChanges();
+      expect(live(fixture).textContent).toContain('Suche online …');
+
+      fixture.componentRef.setInput('status', { kind: 'none' });
+      fixture.detectChanges();
+      expect(live(fixture).textContent).not.toContain('Suche online');
+    });
+
+    it.each([['local-unavailable'], ['offline'], ['server-failed']] as const)(
+      '%s appears at once, without delay',
+      (kind) => {
+        const fixture = render({ status: { kind } });
+
+        expect(live(fixture).textContent?.trim()).not.toBe('');
+      },
+    );
+
+    it('clears the timer on destroy', () => {
+      const fixture = render({ status: { kind: 'searching' } });
+
+      fixture.destroy();
+
+      expect(vi.getTimerCount()).toBe(0);
+    });
   });
 });

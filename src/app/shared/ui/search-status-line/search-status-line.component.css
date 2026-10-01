@@ -22,7 +22,7 @@
 
 /* Systemzustand, kein Fehler: ausschließlich --color-text-muted (design-conventions.md). */
 .status-text-searching {
-  animation: status-fade-in var(--duration-fast) var(--ease-out) 300ms both;
+  animation: status-fade-in var(--duration-fast) var(--ease-out) both;
 }
 
 .retry-button {
@@ -61,8 +61,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  /* Ohne Einblend-Animation, aber mit der 300ms-Verzögerung: schnelle Antworten sollen nichts aufblitzen lassen. */
   .status-text-searching {
-    animation-duration: 1ms;
+    animation: none;
   }
 }

@@ -37,7 +37,9 @@
       <button type="button" class="retry-button" (click)="onRetry()">Erneut versuchen</button>
     }
     @case ('searching') {
-      <span class="status-text status-text-searching">Suche online …</span>
+      @if (searchingTextShown()) {
+        <span class="status-text status-text-searching">Suche online …</span>
+      }
     }
   }
   @if (announcement(); as text) {

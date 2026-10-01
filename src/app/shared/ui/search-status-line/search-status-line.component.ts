@@ -1,5 +1,18 @@
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  effect,
+  inject,
+  input,
+  output,
+  signal,
+  untracked,
+} from '@angular/core';
 import type { SearchStatus } from '../../../core/foods.calculations';
+
+/** Verzögerung, nach der „Suche online …" erst in die Live-Region gesetzt wird (design-conventions.md, Zustand 4). */
+export const SEARCHING_TEXT_DELAY_MS = 300;
 
 /**
  * Geteilte Suchstatus-Zeile (ADR-0021 Punkt 13, design-conventions.md
@@ -24,6 +37,35 @@ export class SearchStatusLineComponent {
 
   /** „Erneut versuchen" — Lokalbestand nachladen bzw. Serversuche wiederholen (je nach Status). */
   readonly retry = output<void>();
+
+  /** `true` erst, wenn „Suche läuft" 300 ms angedauert hat — vorher steht kein Text in der Live-Region. */
+  protected readonly searchingTextShown = signal(false);
+  private searchingTimer: ReturnType<typeof setTimeout> | null = null;
+
+  constructor() {
+    effect(() => {
+      const searching = this.status().kind === 'searching';
+      untracked(() => {
+        this.clearSearchingTimer();
+        if (!searching) {
+          this.searchingTextShown.set(false);
+          return;
+        }
+        this.searchingTimer = setTimeout(() => {
+          this.searchingTimer = null;
+          this.searchingTextShown.set(true);
+        }, SEARCHING_TEXT_DELAY_MS);
+      });
+    });
+    inject(DestroyRef).onDestroy(() => this.clearSearchingTimer());
+  }
+
+  private clearSearchingTimer(): void {
+    if (this.searchingTimer !== null) {
+      clearTimeout(this.searchingTimer);
+      this.searchingTimer = null;
+    }
+  }
 
   protected onRetry(): void {
     this.retry.emit();
