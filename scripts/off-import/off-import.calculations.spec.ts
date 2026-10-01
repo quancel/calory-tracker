@@ -324,8 +324,19 @@ describe('extractNutrientsPer100g', () => {
     ).toBeUndefined();
   });
 
-  it('ignores per 100ml, wrong units and a missing nutrition object', () => {
-    expect(extractNutrientsPer100g(aggregated('100ml', full)).values.kcal).toBeUndefined();
+  it('reads per 100ml like per 100g but reports its own source', () => {
+    const { values, source } = extractNutrientsPer100g(aggregated('100ml', full));
+    expect(source).toBe('nutrition-100ml');
+    expect(values).toEqual({ kcal: 110, kj: undefined, protein: 5, carbs: 10, fat: 5.5 });
+  });
+
+  it('prefers legacy 100g values over a 100ml aggregated set', () => {
+    const raw = { ...aggregated('100ml', full), nutriments: { proteins_100g: 7 } };
+    expect(extractNutrientsPer100g(raw).source).toBe('nutriments');
+  });
+
+  it('ignores other per values, wrong units and a missing nutrition object', () => {
+    expect(extractNutrientsPer100g(aggregated('serving', full)).values.kcal).toBeUndefined();
     expect(
       extractNutrientsPer100g(aggregated('100g', { proteins: { value: 5000, unit: 'mg' } })).values
         .protein,

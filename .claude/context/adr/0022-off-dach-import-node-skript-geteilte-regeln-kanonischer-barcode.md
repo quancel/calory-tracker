@@ -106,6 +106,45 @@ schreibt, kann deshalb nicht zusichern, dass ein Scan ihn findet.
    GitHub-Grenzwert liegt — ein späteres Committen braucht nur die
    `.gitignore`-Zeile zu entfernen.
 
+## Nachtrag 2026-10-01 — Befund aus dem Vollauf (OFF-Export Stand 2026-10-01, 13 GB)
+
+Ergänzt Punkt 3 und 6; die übrigen Punkte gelten unverändert.
+
+8. **Quelle der Nährwerte.** Im echten Export ist `nutriments` bei den
+   meisten DACH-Produkten leer; die Werte stehen in
+   `nutrition.aggregated_set.nutrients` (je Nährstoff Werte pro `100g` bzw.
+   `100ml` mit `unit`). Ohne Rückfall blieben 56 statt 261.399 Produkte.
+   Regel: zuerst die Legacy-Felder `*_100g` aus `nutriments`, **nur wenn
+   dort ein Wert fehlt**, `aggregated_set`. Das Skript bildet die
+   `aggregated_set`-Werte auf die Rohform `OffProductRaw`
+   (`energy-kcal_100g`, `energy_100g` in kJ, `proteins_100g`,
+   `carbohydrates_100g`, `fat_100g`) ab und ruft danach unverändert die
+   geteilten Funktionen aus Punkt 3 auf — kJ→kcal, Rundung, Vollständigkeit
+   und Plausibilität bleiben damit eine einzige Regel. `energy-kcal` wird
+   als kcal, `energy`/`energy-kj` als kJ gelesen; Makros nur in `g`. Eine
+   andere Einheit gilt als fehlender Wert (keine Umrechnung, nichts
+   geraten).
+9. **100 ml wie 100 g (Nutzerentscheidung).** Produkte, deren Werte nur pro
+   `100ml` vorliegen, werden importiert; der Wert pro 100 ml wird als Wert
+   pro 100 g gespeichert. Bewusste Ungenauigkeit (Dichte ≠ 1, z. B. Öl,
+   Sirup), keine Kennzeichnung in der Datenbank. Die Statistik weist diese
+   Zeilen gesondert aus.
+10. **Ablehnungsreihenfolge (bestätigt, ersetzt die Reihenfolge im Handoff
+    `-be`)**: `parse-error` → `not-dach` → `no-barcode` → `no-name` →
+    `incomplete` → `implausible` → doppelter Barcode. Ein negativer Rohwert
+    zählt als `implausible`, nie als `incomplete`. Marke = nur der erste
+    nicht leere Eintrag aus `brands`.
+11. **Kein Rückfall auf fremdsprachige Namen.** ~3,9 % der DACH-Produkte
+    haben nur `product_name_<xx>` in einer anderen Sprache und werden als
+    „kein Name" verworfen. Ein Rückfall darauf wäre eine eigene
+    Produktentscheidung und ist hier nicht getroffen.
+
+**Messwerte des Vollaufs**: 4.785.945 Zeilen gelesen, 537.090 DACH-Treffer,
+261.399 übernommen (vor der 100-ml-Ergänzung), 53 Chargen; 12,2 % der
+vollständigen Produkte wegen Plausibilität verworfen. Speicher nach Import:
+Tabelle 36 MB, Trigram-Index 25 MB, alle Indizes zusammen 59 MB — die
+Schätzung aus ADR-0020 (~120 MB) war zu hoch (siehe Nachtrag dort).
+
 ## Verhältnis zu bestehenden ADRs
 
 - **ADR-0010 Punkt 4** (Barcode-Lookup an der Datenbank): gilt fort, ergänzt
@@ -132,7 +171,10 @@ schreibt, kann deshalb nicht zusichern, dass ein Scan ihn findet.
   **jede** Datei in seinem Laufzeit-Importgraphen; wer dort ein `enum` oder
   eine Parameter-Property einführt, bricht den Import, nicht die App.
   Produkte mit Alkohol/Polyolen weichen typisch > 10 % von Atwater ab und
-  fallen heraus. Ein Altbestand mit Rohwert-Barcode bleibt in dieser Form
+  fallen heraus (gemessen: 12,2 % der vollständigen). Der Scan-Pfad der App
+  liest weiterhin nur die Legacy-Felder `*_100g` der OFF-API; liefert die
+  API sie künftig ebenso leer, betrifft das den Scan (eigenes Paket, nicht
+  hier entschieden). Ein Altbestand mit Rohwert-Barcode bleibt in dieser Form
   stehen (kein Umschreiben bestehender Zeilen).
 - Betrifft künftig: Jedes weitere Werkzeug unter `scripts/` folgt Punkt 1/3
   (`code-conventions.md` „Werkzeuge"). Jeder neue Schreibweg mit Barcode

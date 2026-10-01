@@ -73,6 +73,7 @@ describe('generate-off-seed (fixture .jsonl.gz, no network)', () => {
       '4000000000093', // 0 (Scans gebrochen)
       '4000000000109', // 0 (Scans Text)
       '4000000000116', // 0 (kcal-Text -> kJ-Rückfall)
+      '4000000000147', // 0 (aggregated_set per 100ml, wie 100g behandelt)
       '4000000000154', // 0 (aggregated_set nur kJ)
     ]);
     expect(sql).toContain('2147483647::integer');
@@ -81,7 +82,7 @@ describe('generate-off-seed (fixture .jsonl.gz, no network)', () => {
     expect(sql).toContain("'Gleichstand erste'");
     expect(sql).toContain("'L''Eau Zeile (d''Alsace)'");
     expect(sql).not.toContain('Gleichstand zweite');
-    expect(sql).toContain('Charge 1/1, 11 Zeilen');
+    expect(sql).toContain('Charge 1/1, 12 Zeilen');
   });
 
   it('reports statistics with every rejection reason', async () => {
@@ -92,10 +93,12 @@ describe('generate-off-seed (fixture .jsonl.gz, no network)', () => {
     expect(text).toMatch(/kein DACH-Land:\s+1\b/);
     expect(text).toMatch(/kein Barcode:\s+1\b/);
     expect(text).toMatch(/kein Name:\s+1\b/);
-    expect(text).toMatch(/unvollständig:\s+3\b/);
-    expect(text).toMatch(/davon Nährwerte aus nutrition:\s+2\b/);
+    expect(text).toMatch(/unvollständig:\s+2\b/);
+    expect(text).toMatch(
+      /davon Nährwerte aus nutrition:\s+3 \(je 100 ml, wie 100 g behandelt: 1\)/,
+    );
     expect(text).toMatch(/unplausibel:\s+3\b/);
-    expect(text).toMatch(/Geschrieben:\s+11 Produkte in 1 Chargen/);
+    expect(text).toMatch(/Geschrieben:\s+12 Produkte in 1 Chargen/);
   });
 
   it('is deterministic: same input gives byte-identical output', async () => {

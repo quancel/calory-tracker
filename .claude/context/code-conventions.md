@@ -441,6 +441,11 @@ supabase/
   `auth.uid()` nur zur Indexnutzung, nie als einzige Absicherung.
   Rückgabetyp ändern = `drop function if exists` in einer neuen Migration
   (Contract-Bruch, braucht ADR).
+- Sich gegenseitig ausschließende Suchfälle (z. B. Eingabelänge 2 vs. ≥ 3)
+  als getrennte `union all`-Zweige mit je eigener Fallbedingung formulieren,
+  nicht als ein `or`-Prädikat — ein `or` hat den Planer den Trigram-Index
+  vollständig abarbeiten lassen (1,2 s statt 9–24 ms, ADR-0020 Nachtrag
+  2026-10-01). Die Prüfdatei prüft jeden Zweig.
 - Extensions: `create extension if not exists <name> with schema
   extensions` (Supabase-Standardschema), nie nach `public`.
 - **Prüfabfragen** (`explain`, Kontroll-`select`s) liegen unter
@@ -489,6 +494,11 @@ scripts/
   `*.constants.ts` importiert — nie Dienste, Stores, Komponenten, nie etwas
   mit Angular-/Supabase-Laufzeitimport; Regeln werden importiert, nie
   kopiert. `src/app` importiert nie aus `scripts/`.
+- Weicht die Form einer externen Quelle von der Rohform ab, die eine
+  geteilte Regel erwartet (z. B. OFF `nutrition.aggregated_set` statt
+  `nutriments.*_100g`), bildet das Werkzeug sie **auf diese Rohform ab** und
+  ruft dann die geteilte Funktion — keine zweite Umrechnung im Werkzeug
+  (ADR-0022 Punkt 8).
 - Technische Betriebswerte (Chargengröße, Dateigrößen-Obergrenze,
   Ausgabeort) als exportierte Konstanten in der Datei, die sie nutzt.
 - Ein Werkzeug, das Daten erzeugt, schreibt deterministisch (gleiche Eingabe

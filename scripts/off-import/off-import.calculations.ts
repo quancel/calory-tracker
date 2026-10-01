@@ -58,7 +58,7 @@ export interface ImportProduct {
 }
 
 /** Woher die Nährwerte stammen: Legacy-`nutriments` (`*_100g`) oder `nutrition.aggregated_set` (per 100g). */
-export type NutritionSource = 'nutriments' | 'nutrition';
+export type NutritionSource = 'nutriments' | 'nutrition' | 'nutrition-100ml';
 
 export type Classification =
   | {
@@ -155,7 +155,9 @@ function aggregatedValue(
  * ist `nutriments` bei den meisten neueren DACH-Produkten leer (`{}`) und die
  * Werte stehen nur noch im `nutrition`-Objekt (gemessen am Export vom
  * 2026-10-01: ohne Quelle 2 bleiben ~4 % der DACH-Produkte vollständig).
- * `per === '100ml'` zählt bewusst nicht (die App führt Werte je 100 g).
+ * Quelle 3 (Nutzerentscheidung): `per === '100ml'` — Werte je 100 ml gelten wie
+ * Werte je 100 g (Getränke, Dichte ~1); Quelle `'nutrition-100ml'`, eigener
+ * Zähler in der Statistik.
  */
 export function extractNutrientsPer100g(raw: Record<string, unknown>): {
   values: Nutrients100g;
@@ -173,7 +175,12 @@ export function extractNutrientsPer100g(raw: Record<string, unknown>): {
 
   const nutrition = raw['nutrition'];
   const aggregated = isRecord(nutrition) ? nutrition['aggregated_set'] : undefined;
-  if (!isRecord(aggregated) || aggregated['per'] !== '100g' || !isRecord(aggregated['nutrients'])) {
+  const per = isRecord(aggregated) ? aggregated['per'] : undefined;
+  if (
+    !isRecord(aggregated) ||
+    (per !== '100g' && per !== '100ml') ||
+    !isRecord(aggregated['nutrients'])
+  ) {
     return { values: NO_NUTRIENTS, source: 'nutriments' };
   }
   const nutrients = aggregated['nutrients'];
@@ -186,7 +193,7 @@ export function extractNutrientsPer100g(raw: Record<string, unknown>): {
       carbs: aggregatedValue(nutrients, 'carbohydrates', 'g'),
       fat: aggregatedValue(nutrients, 'fat', 'g'),
     },
-    source: 'nutrition',
+    source: per === '100ml' ? 'nutrition-100ml' : 'nutrition',
   };
 }
 
@@ -390,6 +397,8 @@ export interface ImportStats {
   accepted: number;
   /** Davon mit Nährwerten aus `nutrition.aggregated_set` statt Legacy-`nutriments`. */
   acceptedFromNutrition: number;
+  /** Davon mit Werten je 100 ml (aggregated_set per '100ml'), wie je 100 g behandelt. */
+  acceptedFrom100ml: number;
   rejected: Record<RejectReason, number>;
   /** Kandidat verdrängte einen Vorgänger mit gleichem kanonischem Barcode. */
   replacedDuplicates: number;
@@ -403,6 +412,7 @@ export function createStats(): ImportStats {
     prefiltered: 0,
     accepted: 0,
     acceptedFromNutrition: 0,
+    acceptedFrom100ml: 0,
     rejected: Object.fromEntries(REJECT_REASONS.map((reason) => [reason, 0])) as Record<
       RejectReason,
       number
@@ -446,7 +456,7 @@ export function formatStats(stats: ImportStats, output: OutputSummary): string[]
     `  verworfen, unvollständig:     ${stats.rejected['incomplete']}`,
     `  verworfen, unplausibel:       ${stats.rejected['implausible']} (${percent(stats.rejected['implausible'], dachParsed)} der DACH-Produkte, ${percent(stats.rejected['implausible'], dachParsed - stats.rejected['no-barcode'] - stats.rejected['no-name'] - stats.rejected['incomplete'])} der vollständigen)`,
     `  übernommen:                   ${stats.accepted} (${percent(stats.accepted, dachParsed)}; verworfen gesamt ${dachRejected})`,
-    `    davon Nährwerte aus nutrition:  ${stats.acceptedFromNutrition}`,
+    `    davon Nährwerte aus nutrition:  ${stats.acceptedFromNutrition + stats.acceptedFrom100ml} (je 100 ml, wie 100 g behandelt: ${stats.acceptedFrom100ml})`,
     `  Dubletten (gleicher Barcode): ${stats.replacedDuplicates + stats.droppedDuplicates} (${stats.replacedDuplicates} ersetzt, ${stats.droppedDuplicates} verworfen)`,
     `Geschrieben:                    ${output.products.length} Produkte in ${output.chunkCount} Chargen`,
     `  mit unique_scans_n > 0:       ${withScans} (${percent(withScans, output.products.length)})`,

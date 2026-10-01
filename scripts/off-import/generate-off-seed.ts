@@ -93,6 +93,7 @@ async function readProducts(
     }
     stats.accepted++;
     if (result.nutritionSource === 'nutrition') stats.acceptedFromNutrition++;
+    else if (result.nutritionSource === 'nutrition-100ml') stats.acceptedFrom100ml++;
     const outcome = addProduct(collected, result.product);
     if (outcome === 'replaced') stats.replacedDuplicates++;
     else if (outcome === 'duplicate') stats.droppedDuplicates++;

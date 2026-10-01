@@ -209,11 +209,14 @@ eine abgeschnittene `.gz`-Datei (nur für Stichproben, nicht für den echten
 Import).
 
 Übernommen wird ein Produkt nur, wenn es ein DACH-Land (`countries_tags`),
-einen gültigen Barcode, einen Namen, alle vier `_100g`-Nährwerte (kcal, Protein,
+einen gültigen Barcode, einen Namen, alle vier Nährwerte je 100 g (kcal, Protein,
 Kohlenhydrate, Fett) hat **und** die Plausibilitätsprüfung der App besteht
 (Energie weicht ≤ 10 % von der Atwater-Rechnung ab, Makrosumme ≤ 100 g;
 dieselben Regeln wie beim Scan, per Import aus dem App-Code). Produkte mit
-Alkohol oder Zuckeralkoholen fallen dadurch häufig heraus. Der Name lautet
+Alkohol oder Zuckeralkoholen fallen dadurch häufig heraus. Quelle der Nährwerte: zuerst die
+alten `*_100g`-Felder, sonst `nutrition.aggregated_set` (je 100 g, danach je
+100 ml). **Werte je 100 ml werden wie Werte je 100 g behandelt** (Getränke,
+Dichte ~1); die Statistik weist ihre Anzahl gesondert aus. Der Name lautet
 „Produktname (Marke)", deutscher Name bevorzugt.
 
 **Einspielen** — in einer Schleife, die beim ersten Fehler anhält. Als

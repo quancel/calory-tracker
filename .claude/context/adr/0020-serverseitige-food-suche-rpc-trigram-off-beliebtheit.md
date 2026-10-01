@@ -124,6 +124,26 @@ Basis-Migration **nullable** (der Client liest `null` als `'manual'`,
    Mehrwort-UND-Suche, kein Volltext (`tsvector`), kein Schreibweg für
    `off_popularity` in der App, keine Änderung an `foods`-Policies.
 
+## Nachtrag 2026-10-01 — Messwerte nach dem DACH-Import (PO-2026-09-30-002)
+
+Signatur, Rückgabeform und Rang aus Punkt 4/5 sind **unverändert**; ergänzt
+werden Umsetzungsregel und Messwerte.
+
+- **Zu Punkt 4, Kandidatenmenge als zwei `union all`-Zweige**: ein Zweig
+  nur für Länge 2 (Wortanfänge), ein Zweig nur für Länge ≥ 3 (Teilwort),
+  jeweils über die Längenbedingung ausgeschlossen. Grund (gemessen auf
+  261k Zeilen): Ein einziges Prädikat mit `or` über beide Fälle ließ den
+  Planer bei 2 Zeichen den Trigram-Index vollständig abarbeiten (~1,2 s);
+  mit getrennten Zweigen 9–24 ms. Ein künftiger Umbau, der die Zweige
+  wieder zu einem `or` zusammenfasst, ist eine Regression. Die Prüfdatei
+  (Punkt 6) prüft die Prädikate beider Zweige wortgleich.
+- **Zu Punkt 5**: `top_foods(null)` liefert 0 Zeilen (`limit
+  greatest(null, 0)` → `limit 0`); bestätigt, kein Fehler.
+- **Speicher (korrigiert die Schätzung unter „Konsequenzen")**: gemessen
+  nach Import von 261.399 Zeilen Tabelle 36 MB, Trigram-Index 25 MB, alle
+  Indizes zusammen 59 MB — deutlich unter den geschätzten ~120 MB, weit
+  unter dem Free-Plan-Limit von 500 MB.
+
 ## Verhältnis zu bestehenden ADRs
 
 - **ADR-0012 Punkt 7**: Die *Entscheidung* (Mahlzeit speichern per
@@ -156,7 +176,8 @@ Basis-Migration **nullable** (der Client liest `null` als `'manual'`,
   nicht ändern: Eine spätere Änderung der Rückgabespalten braucht `drop
   function if exists` in einer neuen Migration und ist ein Contract-Bruch
   für 003. Speicher (Free Plan 500 MB): geschätzt ~55 MB Tabelle + ~40 MB
-  Trigram-Index + ~25 MB übrige Indizes bei 300k Zeilen.
+  Trigram-Index + ~25 MB übrige Indizes bei 300k Zeilen — **überholt durch
+  Messung, siehe Nachtrag 2026-10-01** (36 MB Tabelle, 59 MB Indizes).
 - Betrifft künftig: 002 schreibt `off_popularity` gemäß Punkt 2 und darf
   den Trigram-Index für den Massenimport nicht löschen, ohne ihn in
   derselben Datei wieder anzulegen. 003 ruft beide Funktionen nur aus dem
