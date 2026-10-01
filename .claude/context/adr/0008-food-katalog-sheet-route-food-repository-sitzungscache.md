@@ -2,7 +2,11 @@
 
 - **Status**: superseded by ADR-0012 (betrifft Punkt 2 und den Cache-Ort aus
   Punkt 3; Punkte 1, 4, 5 und die Lade-Strategie aus Punkt 3 gelten
-  unverändert fort — siehe ADR-0012, Abschnitt „Verhältnis zu ADR-0008")
+  unverändert fort — siehe ADR-0012, Abschnitt „Verhältnis zu ADR-0008");
+  superseded by ADR-0020 (nur der in Punkt 3 benannte serverseitige
+  Ablösepfad „`ilike` mit Debounce" — serverseitig ersetzt durch
+  `search_foods`; die clientseitige Lade-Strategie regelt Paket
+  PO-2026-09-30-003)
 - **Datum**: 2026-09-21
 - **Bounded Context(s)**: `food-catalog` (wirkt auf `app-shell`, `diary`, `meals`, `data-platform`)
 - **task_id**: `PO-2026-09-20-006`

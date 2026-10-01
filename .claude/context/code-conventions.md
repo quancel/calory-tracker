@@ -4,8 +4,8 @@
 liefern Vorschläge über `notes_for_conventions` im Handoff.
 
 - **Modus**: `vorgegeben` (Greenfield, festgelegt in ADR-0001)
-- **Zuletzt geprüft**: 2026-09-22 (Nachpflege nach Abschluss aller Pakete
-  001–015; Quellen: `notes_for_conventions` der Pakete 013b, 014, 015)
+- **Zuletzt geprüft**: 2026-09-30 (Backend-Abschnitt um RPC-, Extension-
+  und Prüfabfragen-Regeln ergänzt, Paket PO-2026-09-30-001, ADR-0020)
 
 ## Frontend (Angular, Standalone Components, Signals — kein NgRx)
 
@@ -351,7 +351,8 @@ src/
 
 ~~~
 supabase/
-  migrations/<YYYYMMDDHHMMSS>_<beschreibung>.sql   # Schema + RLS, fortlaufend
+  migrations/<YYYYMMDDHHMMSS>_<beschreibung>.sql   # Schema + RLS + Funktionen, fortlaufend
+  checks/<YYYYMMDDHHMMSS>_<beschreibung>.sql       # Prüfabfragen zu einer Migration (ADR-0020)
   seed.sql                                          # optional, keine echten Daten
 ~~~
 
@@ -376,6 +377,30 @@ supabase/
   den Elternsatz, statt `user_id` zu denormalisieren.
 - Keine Secrets im Repo — nur Supabase-URL und Anon-Key über
   `src/environments/`.
+- **Postgres-Funktionen (RPC)** sind ab ADR-0020 zulässig, aber nur
+  **lesend**: `language sql`, `stable`, `security invoker` (nie `security
+  definer`), `set search_path = public, extensions, pg_temp`, Name
+  `<verb>_<objekt>` in snake_case (`search_foods`, `top_foods`),
+  Parameter mit Präfix `p_`, Rückgabe als `returns table (…)` mit
+  snake_case-Spalten wie die Tabelle. In derselben Migration: `revoke
+  execute on function … from public, anon;` und `grant execute on function
+  … to authenticated;` — Supabase gibt `anon` sonst ausdrücklich `execute`.
+  RLS bleibt die Zugriffsgrenze; eine Funktion filtert zusätzlich nach
+  `auth.uid()` nur zur Indexnutzung, nie als einzige Absicherung.
+  Rückgabetyp ändern = `drop function if exists` in einer neuen Migration
+  (Contract-Bruch, braucht ADR).
+- Extensions: `create extension if not exists <name> with schema
+  extensions` (Supabase-Standardschema), nie nach `public`.
+- **Prüfabfragen** (`explain`, Kontroll-`select`s) liegen unter
+  `supabase/checks/` mit demselben Zeitstempel wie die geprüfte Migration.
+  Sie sind rein lesend bzw. laufen in `begin … rollback`, werden **nie** als
+  Migration eingespielt und nicht in `migrations/` abgelegt. `explain` auf
+  einen RPC-Aufruf zeigt nur einen `Function Scan` — geprüft wird das
+  Prädikat aus dem Funktionsrumpf, wortgleich, mit Kommentarverweis an
+  beiden Stellen.
+- Spalten, die ein Import aus einer externen Quelle füllt, tragen deren
+  Präfix (`off_popularity`) und bekommen `not null default <neutral>`, damit
+  App-Inserts unverändert bleiben (ADR-0020 Punkt 2).
 
 ## Abweichungen
 

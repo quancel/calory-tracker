@@ -49,7 +49,10 @@ keine stillschweigenden Neuerfindungen.
   Exklusivität der Sync-Marker-Inline-Erläuterung („Sync-Status-Marker")
   von „seitenweit" auf „pro Mahlzeiten-Sektion" präzisiert — entspricht dem
   tatsächlich umgesetzten und für den Anwendungsfall passenden Verhalten.
-- **Zuletzt überarbeitet**: 2026-09-22.
+  Ergänzt am 2026-09-30 in Runde 2 des Pakets PO-2026-09-30-003
+  (Hybrid-Suche lokal + Server: gemeinsame Suchstatus-Zeile, Zustände,
+  Mindestlänge, Stabilitätsregeln).
+- **Zuletzt überarbeitet**: 2026-09-30.
 - **Grundlage**: `.claude/context/design-concept.md` (verbindlich, siehe dort
   für Marke, Farbsystem, Theming, Typografie, Spacing, Form & Tiefe,
   Ikonografie, Motion, Barrierefreiheit — wird hier nicht wiederholt).
@@ -1125,3 +1128,96 @@ zutreffende Bedingung gewinnt**:
   Bestätigungsdialog. Für zukünftige Tage keine Eingabe.
 - Ladefehler der Messungen: Hinweistext + „Erneut versuchen" in der Karte,
   Eingabe ausgeblendet; der Tagesinhalt bleibt unberührt.
+
+## Hybrid-Suche (lokal + Server) (wiederverwendbares Pattern, Paket PO-2026-09-30-003)
+
+Gilt für jede Food-Suche: Step A des Eintrags-Sheets und M2 des
+Mahlzeit-Sheets (ein Lesepfad, ein Erscheinungsbild). Trefferzeile,
+Marker-Slot, Skeleton und Step B/C bleiben unverändert (siehe
+„Plausibilitäts-/Vollständigkeits-Marker", „Karten/Listen"). Neu ist nur die
+gemeinsame **Suchstatus-Zeile** als eine geteilte Präsentations-Komponente.
+
+### Liste und Stabilität
+
+- **Mindest-Eingabelänge Serversuche: 2 Zeichen nach trim.** Lokale Suche ab
+  1 Zeichen. Bei leerer Suche bleibt alles wie bisher („Zuletzt verwendet"
+  bzw. „Suche nach einem Lebensmittel"), kein Serveraufruf.
+- **Reihenfolge**: zuerst die lokalen Treffer, darunter die Server-Treffer in
+  derselben Liste — kein Zwischentitel, kein Trenner, keine
+  Quellenkennzeichnung in der Zeile. Innerhalb beider Gruppen gilt dieselbe
+  Sortierung: manuell angelegte/korrigierte Foods zuerst, dann vom
+  angemeldeten Nutzer geloggte, dann nach OFF-Beliebtheit; keine sichtbare
+  Kennzeichnung dieser Rangfolge. Höchstens **20 Server-Treffer**, kein
+  „Mehr laden", kein Weiterblättern.
+- **Nur anhängen**: Kommen Server-Treffer, ändern lokale Zeilen weder
+  Position noch Reihenfolge. Neue Zeilen blenden mit `--duration-fast`
+  (120ms) `--ease-out` per Fade ein, kein Slide; `prefers-reduced-motion`:
+  ohne Animation.
+- Ändert sich die Eingabe, verschwinden Server-Treffer der vorigen Eingabe
+  sofort; veraltete Antworten bleiben ohne sichtbare Wirkung. Wird das Feld
+  geleert, verschwinden Server-Treffer und Statuszeile sofort.
+- Fokus bleibt im Suchfeld, kein Fokusraub, kein Scrollen der Liste. Tab-
+  Reihenfolge: Suchfeld, Scan-Button, Button der Statuszeile, Trefferzeilen.
+
+### Suchstatus-Zeile
+
+- Direkt unter dem Suchfeld, oberhalb der Liste, `role="status"`,
+  `aria-live="polite"`, `--font-size-xs`/`--color-text-muted`. Platz von ca.
+  24px ist reserviert, solange die Zeile sichtbar sein kann (Eingabe >= 2
+  Zeichen oder Ladefehler des Lokalbestands), damit die Liste nicht springt.
+- **Eine Zeile, nie mehrere gleichzeitig.** Bei mehreren zutreffenden
+  Zuständen gewinnt die erste in dieser Priorität:
+  1. **Lokalbestand nicht geladen**: Text „Lokale Treffer nicht verfügbar",
+     Textbutton „Erneut versuchen" (lädt den Lokalbestand neu). Kein Icon.
+     Erscheint unabhängig von der Eingabelänge (auch bei leerer Suche).
+  2. **Offline**: Icon `cloud-off` (16px), „Offline – nur lokale Treffer",
+     kein Button.
+  3. **Serversuche fehlgeschlagen** (Netz da, Fehler/Timeout/5xx): Icon
+     `cloud-off`, „Online-Suche fehlgeschlagen", Textbutton „Erneut
+     versuchen" (stößt die Serversuche für die aktuelle Eingabe sofort an).
+  4. **Serversuche läuft**: „Suche online …", nur Text, ohne Spinner/
+     Animation; Einblenden 120ms Fade mit 300ms `transition-delay`, damit
+     schnelle Antworten nichts aufblitzen lassen.
+  Löst der Nutzer die Ursache höherer Priorität (z. B. Neuladen des
+  Lokalbestands gelingt), fällt die Zeile auf den nächsten zutreffenden
+  Zustand zurück. Bei Erfolg ohne Sonderfall ist die Zeile leer.
+- Farbe: ausschließlich `--color-text-muted` — weder `--color-warning` noch
+  `--color-danger` (Systemzustand, analog Sync-Status-Marker; hält
+  `--color-warning` bei seinen bestätigten Verwendungsfällen).
+  Retry-Button: Textbutton `--color-text`, kein Rahmen, 48px Trefferfläche.
+  Jede neue Eingabe >= 2 Zeichen startet automatisch eine neue Serversuche.
+  Kein Timer-Autodismiss.
+- Screenreader: nach erfolgreicher Serversuche einmalig (sr-only, polite)
+  „{n} Treffer online" bzw. „Keine weiteren Treffer online".
+
+### Zustände der Trefferliste
+
+- **Lokale Treffer bei laufender Serversuche**: lokale Liste voll bedienbar,
+  Statuszeile „Suche online …".
+- **Keine Treffer aus beiden Quellen**: Leerzustand „Kein Treffer für „x""
+  (Step A mit Button „„x" anlegen", M2 nur die Zeile) erscheint erst, wenn
+  die Serversuche erfolgreich beendet ist. Solange sie läuft und lokal
+  nichts passt: Statuszeile plus 2 Skeleton-Zeilen. Bei genau 1 Zeichen ohne
+  lokalen Treffer ergänzt der Leerzustand „Online-Suche ab 2 Zeichen."
+  (`--color-text-muted`).
+- **Serversuche fehlgeschlagen/offline ohne lokalen Treffer**: Text „Keine
+  lokalen Treffer für „x"" statt „Kein Treffer"; Statuszeile wie oben;
+  Button „„x" anlegen" in Step A bleibt. Ist der Lokalbestand nicht geladen,
+  lautet der Text „Keine Treffer online für „x"" (sobald die Serversuche
+  beendet ist). Das Suchfeld wird nie deaktiviert.
+- **Erstes Laden ohne lokalen Bestand**: bestehendes Skeleton (3 Zeilen
+  Step A, 2 Zeilen M2) für den Lokalbestand; Suchfeld sofort bedienbar.
+  Liefert eine laufende Serversuche Treffer, ersetzen sie das Skeleton.
+- **Ladefehler des Lokalbestands** ersetzt **nicht** mehr die Liste durch
+  einen Fehlerblock (auch nicht in M2): nur Statuszeile (Priorität 1),
+  Suche und Serversuche bleiben nutzbar.
+- Server-Treffer sind wie lokale auswählbar (Step B), korrigierbar (Step C)
+  und tragen den Plausibilitäts-/Vollständigkeits-Marker nach bestehender
+  Priorität. In M2 bleibt der Marker nicht-interaktiv.
+
+### Wortlaut
+
+„Suche online …", „Offline – nur lokale Treffer", „Online-Suche
+fehlgeschlagen", „Lokale Treffer nicht verfügbar", „Erneut versuchen",
+„Keine lokalen Treffer für „x"", „Keine Treffer online für „x"",
+„Online-Suche ab 2 Zeichen."

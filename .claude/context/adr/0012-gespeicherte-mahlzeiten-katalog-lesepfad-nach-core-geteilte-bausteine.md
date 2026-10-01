@@ -1,6 +1,10 @@
 # ADR-0012: Gespeicherte Mahlzeiten — Katalog-Lesepfad und Sitzungs-Cache nach `core/`, geteilte Sheet-/Dialog-/Marker-Bausteine nach `shared/ui/`, Mahlzeiten-Lesepfad in `core/`
 
-- **Status**: accepted (löst ADR-0008 ab — siehe „Verhältnis zu ADR-0008")
+- **Status**: accepted (löst ADR-0008 ab — siehe „Verhältnis zu ADR-0008");
+  superseded by ADR-0020 (nur das RPC-Verbot in der Begründung von Punkt 7
+  und unter „Alternativen", und nur für **lesende** Funktionen — die
+  Entscheidung „Kompensation statt Transaktion" in Punkt 7 und alle übrigen
+  Punkte gelten fort)
 - **Datum**: 2026-09-21
 - **Bounded Context(s)**: `meals`, `food-catalog` (wirkt auf `app-shell`, `diary`, `data-platform`)
 - **task_id**: `PO-2026-09-20-010`

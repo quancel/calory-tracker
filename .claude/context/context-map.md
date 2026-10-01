@@ -4,9 +4,9 @@
 Rollen lesen.
 
 - **Angelegt**: 2026-09-20 (Paket PO-2026-09-20-001, Greenfield)
-- **Zuletzt geprüft**: 2026-09-22 (Paket PO-2026-09-20-015, „Gewichtslog &
-  Kalorienziel-Vorschlag", ADR-0017 und dessen Teil-Ablösung ADR-0018
-  (Zielgewicht) — **kein** neuer Context, das Gewichtslog gehört zu `goals`)
+- **Zuletzt geprüft**: 2026-09-30 (Paket PO-2026-09-30-001, serverseitige
+  Food-Suche, ADR-0020 — **kein** neuer Context, die Such-/Top-N-Funktionen
+  gehören zu `data-platform`)
 
 Register, kein Design-Dokument. Details gehören in ADRs.
 
@@ -22,7 +22,7 @@ Register, kein Design-Dokument. Details gehören in ADRs.
 | `goals` | `src/app/goals/` | Tagesziele (kcal, Makros) je Nutzer; ab Paket 015 zusätzlich Gewichtslog (Erfassen, Liniendiagramm) und der daraus abgeleitete Kalorienziel-Vorschlag (ADR-0017) | frontend-lead |
 | `stats` | `src/app/stats/` | Verlauf (Woche/Monat), Balken-Chart — **kein** Gewichtslog (ADR-0017 Punkt 1; der frühere Platzhalter „optional Gewichtslog" ist hiermit aufgelöst) | frontend-lead |
 | `offline-sync` | `src/app/core/connectivity.service.ts`, `src/app/core/local-db.service.ts`, `src/app/core/entry-queue.service.ts`, `src/app/core/entry-sync.service.ts` (Dateien, kein Ordner) | Verbindungszustand, lokale Persistenz (IndexedDB), Puffer-Queue für noch nicht übertragene Einträge und deren Hintergrund-Übertragung — hinter `core/entries.service.ts`, ohne eigenen UI-Einstieg | frontend-lead |
-| `data-platform` | `supabase/` | Postgres-Schema, Row Level Security, Migrationen als SQL im Repo | backend-lead |
+| `data-platform` | `supabase/` | Postgres-Schema, Row Level Security, Migrationen als SQL im Repo, lesende Postgres-Funktionen (RPC, ab ADR-0020) samt Prüfabfragen | backend-lead |
 
 ## Schnittstellen zwischen Contexts
 
@@ -171,6 +171,16 @@ Nur was für Routing-Entscheidungen zählt.
   Kalorienziel-Vorschlag ist ab ADR-0018 **zielbasiert** (trendkorrigierter
   Erhaltungsbedarf + gedeckelte Zielrate) und setzt ein gesetztes
   Zielgewicht voraus — ADR-0017 Punkt 3 gilt nicht mehr.
+- `food-catalog`/`meals` (über `core/`) → `data-platform` (ab Paket
+  PO-2026-09-30-001, ADR-0020): erste **Postgres-Funktionen** im Projekt,
+  aufgerufen per PostgREST-RPC — `search_foods(p_query, p_limit)` (Suche mit
+  Rang: manuell/korrigiert > Textstufe > **eigene** Nutzung > OFF-Beliebtheit)
+  und `top_foods(p_limit)` (nutzerunabhängig, Range-Paging gegen das
+  1000er-Limit). Beide `security invoker`: RLS bleibt die einzige
+  Zugriffsgrenze, die Nutzung des anderen Nutzers ist strukturell
+  unsichtbar. `foods.off_popularity` schreibt nur der DACH-Import (Paket
+  002), nie die App. Wo die App die Funktionen aufruft und wie der lokale
+  Bestand aussieht, legt Paket PO-2026-09-30-003 fest.
 - `app-shell` → alle: stellt Routen, Tokens und den Supabase-Client aus
   `core/` bereit; enthält selbst keine Fachlogik. `MealType` und die
   Mahlzeit-Labels/-Reihenfolge liegen als gemeinsame Konstanten in
