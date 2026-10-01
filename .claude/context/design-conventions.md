@@ -1141,14 +1141,22 @@ gemeinsame **Suchstatus-Zeile** als eine geteilte Präsentations-Komponente.
 
 - **Mindest-Eingabelänge Serversuche: 2 Zeichen nach trim.** Lokale Suche ab
   1 Zeichen. Bei leerer Suche bleibt alles wie bisher („Zuletzt verwendet"
-  bzw. „Suche nach einem Lebensmittel"), kein Serveraufruf.
+  bzw. „Suche nach einem Lebensmittel"), kein Serveraufruf. Das gilt
+  **gleich in Step A und M2** (M2 zeigt bei leerer Suche ebenfalls „Zuletzt
+  verwendet", Nutzerentscheidung).
 - **Reihenfolge**: zuerst die lokalen Treffer, darunter die Server-Treffer in
   derselben Liste — kein Zwischentitel, kein Trenner, keine
-  Quellenkennzeichnung in der Zeile. Innerhalb beider Gruppen gilt dieselbe
-  Sortierung: manuell angelegte/korrigierte Foods zuerst, dann vom
-  angemeldeten Nutzer geloggte, dann nach OFF-Beliebtheit; keine sichtbare
-  Kennzeichnung dieser Rangfolge. Höchstens **20 Server-Treffer**, kein
-  „Mehr laden", kein Weiterblättern.
+  Quellenkennzeichnung in der Zeile. Innerhalb jeder der beiden Gruppen
+  (lokal, Server) gilt dieselbe Rangfolge (Nutzer bestätigt): manuell
+  angelegte/korrigierte Foods → Textübereinstimmung → eigene Nutzung (vom
+  angemeldeten Nutzer geloggt) → OFF-Beliebtheit. Keine sichtbare
+  Kennzeichnung dieser Rangfolge.
+- **Obergrenzen**: höchstens **50 lokale Treffer**, nach Rang gekürzt
+  (Nutzerentscheidung; ohne Kürzung rendert ein einzelnes Zeichen bei 5.000
+  lokalen Foods ca. 5.000 Zeilen, ~666 ms). Höchstens **20 Server-
+  Treffer**, kein „Mehr laden", kein Weiterblättern. Server-Treffer werden
+  gegen **alle** lokalen Foods entdoppelt, nicht nur gegen die angezeigten
+  50.
 - **Nur anhängen**: Kommen Server-Treffer, ändern lokale Zeilen weder
   Position noch Reihenfolge. Neue Zeilen blenden mit `--duration-fast`
   (120ms) `--ease-out` per Fade ein, kein Slide; `prefers-reduced-motion`:
@@ -1176,15 +1184,21 @@ gemeinsame **Suchstatus-Zeile** als eine geteilte Präsentations-Komponente.
      `cloud-off`, „Online-Suche fehlgeschlagen", Textbutton „Erneut
      versuchen" (stößt die Serversuche für die aktuelle Eingabe sofort an).
   4. **Serversuche läuft**: „Suche online …", nur Text, ohne Spinner/
-     Animation; Einblenden 120ms Fade mit 300ms `transition-delay`, damit
-     schnelle Antworten nichts aufblitzen lassen.
+     Animation. **Sichtbar und angesagt erst nach 300ms**: Der Text wird
+     erst nach 300ms in die Zeile/`aria-live`-Region gesetzt (nicht nur per
+     `opacity` verzögert) und Einblenden dann 120ms Fade. Antwortet der
+     Server früher, wird der Text nie gesetzt — weder sichtbar noch für
+     Screenreader. Die Live-Region selbst bleibt dauerhaft im DOM (leer),
+     nur ihr Inhalt wechselt. Gilt nur für Zustand 4; die Zustände 1–3
+     erscheinen und werden sofort angesagt.
   Löst der Nutzer die Ursache höherer Priorität (z. B. Neuladen des
   Lokalbestands gelingt), fällt die Zeile auf den nächsten zutreffenden
   Zustand zurück. Bei Erfolg ohne Sonderfall ist die Zeile leer.
-- Farbe: ausschließlich `--color-text-muted` — weder `--color-warning` noch
-  `--color-danger` (Systemzustand, analog Sync-Status-Marker; hält
-  `--color-warning` bei seinen bestätigten Verwendungsfällen).
-  Retry-Button: Textbutton `--color-text`, kein Rahmen, 48px Trefferfläche.
+- Farbe: Statustext (und Icon) ausschließlich `--color-text-muted` — weder
+  `--color-warning` noch `--color-danger` (Systemzustand, analog
+  Sync-Status-Marker; hält `--color-warning` bei seinen bestätigten
+  Verwendungsfällen). Der Retry-Button ist bewusst abgesetzt: Textbutton in
+  `--color-text`, kein Rahmen, kein Akzent, 48px Trefferfläche.
   Jede neue Eingabe >= 2 Zeichen startet automatisch eine neue Serversuche.
   Kein Timer-Autodismiss.
 - Screenreader: nach erfolgreicher Serversuche einmalig (sr-only, polite)
