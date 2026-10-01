@@ -4,8 +4,10 @@
 liefern Vorschläge über `notes_for_conventions` im Handoff.
 
 - **Modus**: `vorgegeben` (Greenfield, festgelegt in ADR-0001)
-- **Zuletzt geprüft**: 2026-09-30 (Backend-Abschnitt um RPC-, Extension-
-  und Prüfabfragen-Regeln ergänzt, Paket PO-2026-09-30-001, ADR-0020)
+- **Zuletzt geprüft**: 2026-09-30 (Foods-Lesepfad, Offline-Lesecache,
+  Such-Konstanten, `core/`-Factory und Statuszeile für die Hybrid-Suche,
+  Paket PO-2026-09-30-003, ADR-0021; davor Backend-Abschnitt RPC/Extension/
+  Prüfabfragen, PO-2026-09-30-001, ADR-0020)
 
 ## Frontend (Angular, Standalone Components, Signals — kein NgRx)
 
@@ -239,13 +241,23 @@ src/
   Backoff-Stufen, Liste der als permanent geltenden Statuscodes) stehen als
   exportierte Konstanten **in** `core/entry-sync.service.ts`, nicht in
   `core/*.constants.ts`.
-- Offline-Lesecache: Schnappschüsse (zuletzt geladener Tag + Zielzeile,
-  zuletzt geladener Food-Bestand) werden nach jedem **erfolgreichen** Laden
-  über `core/local-db.service.ts` geschrieben und nur bei gescheiterter
-  Abfrage gelesen. Ein Schnappschuss ist reiner Anzeige-Ersatz und nie
-  Grundlage eines Schreibvorgangs; die netzabhängigen Lesepfade
-  (`diary.service.ts`, `core/foods.service.ts`) bleiben in ihrer Query
-  unverändert (ADR-0016 Punkt 8).
+- Offline-Lesecache **des Tages**: Der Schnappschuss (zuletzt geladener Tag
+  + Zielzeile) wird nach jedem **erfolgreichen** Laden über
+  `core/local-db.service.ts` geschrieben und nur bei gescheiterter Abfrage
+  gelesen — reiner Anzeige-Ersatz, nie Grundlage eines Schreibvorgangs
+  (ADR-0016 Punkt 8).
+- Lokaler **Food**-Bestand (ADR-0021): liegt in `foods-snapshot` unter den
+  Schlüsseln `'top'`, `'shared'`, `'user:<userId>'`, jeder Wert trägt
+  `schema` (`FOODS_SNAPSHOT_SCHEMA` in `core/foods.service.ts`). Er wird beim
+  Start **zuerst** aus IndexedDB gelesen und danach aufgefrischt; der
+  Top-Teil nur bei abweichendem `schema`/`topN`/Fingerabdruck. Neue
+  Teil-Arten kommen als neuer Schlüssel, eine neue `Food`-Form als
+  `schema`-Erhöhung — keine zweite Datenbank, kein `localStorage`.
+- Listenabfragen gegen PostgREST, die mehr als 1000 Zeilen liefern können
+  (Tabellen wie RPCs): seitenweise per `.range()` mit stabiler Sortierung;
+  der Versatz rückt um die **tatsächlich gelieferte** Zeilenzahl vor, Ende
+  bei leerer Seite oder erreichter Obergrenze — nie „Seite kürzer als 1000
+  ⇒ Ende" (ADR-0021 Punkt 5). Kein Pfad lädt `foods` ungefiltert.
 - Rücknahme einer gerade ausgeführten Massenaktion (z. B. „gestern
   kopieren"): ausschließlich über die beim Anlegen zurückgegebenen
   **Datensatz-IDs**, nie über eine Merkmalssuche und nie über ein
@@ -254,13 +266,44 @@ src/
   wird nicht persistiert und beim Verlassen der Ansicht bzw. Wechsel des
   fachlichen Bezugs (Datum) geleert (ADR-0013). Der Reload-Pfad des Stores
   setzt diesen Zustand nicht zurück.
-- Foods **lesen** (Liste + Sitzungs-Cache): `src/app/core/foods.service.ts`
-  — genau ein Cache im Projekt, Feature-Stores filtern über dessen
-  `foods()`-Signal mit eigener Query. Foods **schreiben** (Anlegen,
-  Korrigieren), Barcode-Lookup und Open Food Facts bleiben ausschließlich in
+- Foods **lesen** (lokaler Bestand, `top_foods`, `search_foods`):
+  ausschließlich `src/app/core/foods.service.ts` — genau ein Cache im
+  Projekt; `foods()` ist der lokale Teilbestand, nicht der Katalog
+  (ADR-0021). Food-Suche in einem Feature-Store läuft **nur** über
+  `createHybridFoodSearch()` aus `src/app/core/hybrid-food-search.ts` (je
+  Store eine Instanz im Feldinitialisierer) — kein Store filtert `foods()`
+  selbst für eine Suche. Foods **schreiben** (Anlegen, Korrigieren),
+  Barcode-Lookup und Open Food Facts bleiben ausschließlich in
   `src/app/food-search/food-search.service.ts` (ADR-0012 Punkt 1). Der Typ
-  `Food` wird in `core/foods.service.ts` definiert — keine zweite
-  Definition, kein Re-Export.
+  `Food`, die `foods`-Spaltenliste und die Zeilen-Abbildung werden in
+  `core/foods.service.ts` definiert und exportiert; `food-search.service.ts`
+  importiert sie — keine zweite Definition, kein Re-Export. Jedes Food, mit
+  dem der Nutzer interagiert (Auswahl eines Server-Treffers, Anlegen,
+  Korrigieren, Scan), geht sofort über `CoreFoodsService.upsertFood()` in
+  den lokalen Bestand.
+- Wer ein Food zu einer ID **asynchron** braucht (z. B. für den
+  Queue-Schnappschuss), nutzt `CoreFoodsService.findFood(id)` — wartet das
+  Lesen des gespeicherten Bestands ab, statt sich auf `foods()` zum
+  Aufrufzeitpunkt zu verlassen (ADR-0021 Punkt 6/8).
+- Produktwerte der Food-Suche (`LOCAL_TOP_N`, `SERVER_RESULT_LIMIT`,
+  `MIN_SERVER_QUERY_LENGTH`): ausschließlich
+  `src/app/core/food-search.constants.ts`. Technische Werte (Debounce,
+  Zeitlimit, Seitengröße, Fingerabdruck-Größe, RPC-Abfragelimit,
+  Snapshot-Schema) als exportierte Konstante in der Datei, die sie nutzt
+  (`hybrid-food-search.ts` bzw. `foods.service.ts`).
+- Zustandslogik, die **zwei Feature-Stores identisch** brauchen und die je
+  Store einen **eigenen** Zustand haben muss: Factory-Funktion
+  `create<Name>()` in `src/app/core/<name>.ts`, aufgerufen im
+  Feldinitialisierer des Stores (Injection Context, `inject()` innerhalb
+  der Factory erlaubt). Sie gibt `readonly`-Signals und Methoden zurück;
+  die reinen Regeln darin liegen in `core/<thema>.calculations.ts`. Kein
+  zweiter Store, kein Singleton-Dienst für Per-Store-Zustand (ADR-0021
+  Punkt 10). Erstes Vorkommen: `createHybridFoodSearch()`.
+- Suchstatus-Zeile: `src/app/shared/ui/search-status-line/` — zustandslos,
+  Input Status (Summentyp aus `core/foods.calculations.ts`), Output `retry`;
+  Icons als Inline-SVG wie im übrigen Projekt. Ein eigener
+  Lade-/Fehlerblock für den Food-Bestand in einem Sheet ist ab hier eine
+  Abweichung (ADR-0021 Punkt 13).
 - Reine Food-/Nährwert-Rechenlogik mit mehr als einem nutzenden Feature
   (Filter, Mengen-/Live-Berechnung, Plausibilitäts-/Vollständigkeitsprüfung,
   generische Feldvalidierung): `src/app/core/foods.calculations.ts`; die
@@ -420,7 +463,15 @@ nächster Gelegenheit „korrigiert" werden.
   Paket 010 für `core/foods.service.ts`, `core/foods.calculations.ts`,
   `core/meals.service.ts` und `core/meals.calculations.ts` (ADR-0012) —
   die Abhängigkeit zwischen `meals` und `food-catalog` läuft in beide
-  Richtungen und ist nur über `core/` importfrei auflösbar.
+  Richtungen und ist nur über `core/` importfrei auflösbar. Ab ADR-0021
+  ebenso `core/hybrid-food-search.ts` (Suchzustand für Step A und M2).
+- `core/foods.service.ts` liest ab ADR-0021 zusätzlich eigene `entries`
+  (`food_id` + eingebettetes Food) und eigene `meal_items` (eingebettetes
+  Food) — eine weitere Lesestelle auf `entries` neben `diary`, `stats`,
+  `goals` und `entries.service.ts`. Bewusst: Sie liefert Foods für den
+  nutzergebundenen Teil des lokalen Bestands samt Nutzungszahl, keine
+  Einträge. Nicht nach `entries.service.ts` verschieben und nicht als
+  „dritter Bereichsleser" (ADR-0017 Punkt 4) werten.
 - `core/entries.service.ts` kapselt ab Paket 014 zusätzlich
   Fehlerklassifizierung (permanent vs. temporär) und Pufferung — bewusst
   mehr Fachlichkeit an einer Stelle, weil der Puffer sonst an drei Features

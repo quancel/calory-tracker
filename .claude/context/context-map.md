@@ -4,9 +4,9 @@
 Rollen lesen.
 
 - **Angelegt**: 2026-09-20 (Paket PO-2026-09-20-001, Greenfield)
-- **Zuletzt geprüft**: 2026-09-30 (Paket PO-2026-09-30-001, serverseitige
-  Food-Suche, ADR-0020 — **kein** neuer Context, die Such-/Top-N-Funktionen
-  gehören zu `data-platform`)
+- **Zuletzt geprüft**: 2026-09-30 (Paket PO-2026-09-30-003, Hybrid-Suche,
+  ADR-0021 — **kein** neuer Context; lokaler Food-Bestand bleibt in
+  `core/foods.service.ts`, Persistenz über `offline-sync`)
 
 Register, kein Design-Dokument. Details gehören in ADRs.
 
@@ -34,9 +34,18 @@ Nur was für Routing-Entscheidungen zählt.
   Supabase-Dashboard angelegt, die App hat kein Signup.
 - `diary`, `meals`, `goals`, `stats` → `data-platform`: direkter
   Supabase-Client-Zugriff (PostgREST) unter RLS. Kein eigener API-Server.
-- **Foods lesen** (Liste + Sitzungs-Cache): `src/app/core/foods.service.ts` —
+- **Foods lesen** (lokaler Bestand + Serversuche): `src/app/core/foods.service.ts` —
   genau ein Cache im Projekt, genutzt von `food-catalog` (Step A) und
-  `meals` (Step M2), ADR-0012 Punkt 1. **Foods schreiben** (Anlegen,
+  `meals` (Step M2), ADR-0012 Punkt 1. Ab ADR-0021 ist `foods()` der
+  **lokale Teilbestand** (Top-N nach OFF-Beliebtheit + manuelle/korrigierte
+  + vom angemeldeten Nutzer geloggte/in Mahlzeiten verwendete Foods), nie der
+  Gesamtkatalog; Treffer darüber hinaus kommen per `search_foods` und
+  werden in derselben Liste angehängt. Beide Features nutzen dieselbe
+  Suchlogik (`core/hybrid-food-search.ts`) und dieselbe Statuszeile
+  (`shared/ui/search-status-line/`). Für den nutzergebundenen Teil liest
+  `core/foods.service.ts` zusätzlich eigene `entries` (`food_id` + eingebettetes
+  Food) und eigene `meal_items` (eingebettetes Food) — nur lesend, nur zu
+  diesem Zweck. **Foods schreiben** (Anlegen,
   Korrigieren) sowie Barcode-Lookup und Open Food Facts bleiben
   ausschließlich in `food-catalog` (`food-search.service.ts`); kein Feature
   baut eigene `foods`-Queries. **Ausgenommen ist der Lesepfad der eigenen
@@ -152,8 +161,12 @@ Nur was für Routing-Entscheidungen zählt.
   `ngsw-config.json` bleibt ohne `dataGroups` (ADR-0002 gilt fort);
   Offline-Verhalten für Fachdaten entsteht ausschließlich in der
   Anwendungsschicht. Der Kaltstart ohne Netz zeigt Schnappschüsse aus
-  IndexedDB (zuletzt geladener Tag + Zielzeile, zuletzt geladener
-  Food-Bestand) — Anzeige-Ersatz, nie Schreibquelle (ADR-0016 Punkt 8).
+  IndexedDB (zuletzt geladener Tag + Zielzeile) — Anzeige-Ersatz, nie
+  Schreibquelle (ADR-0016 Punkt 8). Der lokale Food-Bestand liegt ab
+  ADR-0021 dauerhaft in IndexedDB (`foods-snapshot`, Teile `top`/`shared`/
+  `user:<id>`) und ist primärer Suchbestand, nicht nur Ersatz; der
+  nutzergebundene Teil wird beim Nutzerwechsel getauscht, fremde
+  Nutzer-Teile werden gelöscht.
 - `goals` → `data-platform` (ab Paket 015, ADR-0017): eigene Tabelle
   `weight_logs` mit `unique (user_id, date)` und RLS auf `auth.uid()`;
   geschrieben wird per Upsert auf `(user_id, date)`, gelöscht über die `id`.
@@ -179,8 +192,8 @@ Nur was für Routing-Entscheidungen zählt.
   1000er-Limit). Beide `security invoker`: RLS bleibt die einzige
   Zugriffsgrenze, die Nutzung des anderen Nutzers ist strukturell
   unsichtbar. `foods.off_popularity` schreibt nur der DACH-Import (Paket
-  002), nie die App. Wo die App die Funktionen aufruft und wie der lokale
-  Bestand aussieht, legt Paket PO-2026-09-30-003 fest.
+  002), nie die App. Aufgerufen werden beide Funktionen ausschließlich aus
+  `src/app/core/foods.service.ts` (ADR-0021).
 - `app-shell` → alle: stellt Routen, Tokens und den Supabase-Client aus
   `core/` bereit; enthält selbst keine Fachlogik. `MealType` und die
   Mahlzeit-Labels/-Reihenfolge liegen als gemeinsame Konstanten in

@@ -4,7 +4,9 @@
   superseded by ADR-0020 (nur das RPC-Verbot in der Begründung von Punkt 7
   und unter „Alternativen", und nur für **lesende** Funktionen — die
   Entscheidung „Kompensation statt Transaktion" in Punkt 7 und alle übrigen
-  Punkte gelten fort)
+  Punkte gelten fort); superseded by ADR-0021 (nur die Lade-Strategie in
+  Punkt 1 — „einmal je Sitzung laden", `foods()` als Gesamtkatalog; Ort des
+  Lesepfads und „genau ein Cache" gelten fort)
 - **Datum**: 2026-09-21
 - **Bounded Context(s)**: `meals`, `food-catalog` (wirkt auf `app-shell`, `diary`, `data-platform`)
 - **task_id**: `PO-2026-09-20-010`

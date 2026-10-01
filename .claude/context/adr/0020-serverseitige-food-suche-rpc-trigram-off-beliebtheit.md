@@ -77,10 +77,9 @@ Basis-Migration **nullable** (der Client liest `null` als `'manual'`,
      `name ilike '%-' || q || '%'`. Grund: Aus einem 2-Zeichen-Teilwort
      (`'%ei%'`) extrahiert `pg_trgm` kein Trigramm, der Index greift nicht,
      die Suche wird zum Seq-Scan über ~300k Zeilen; ein Wortanfang liefert
-     die Rand-Trigramme (`'  e'`, `' ei'`) und bleibt indexgestützt. Diese
-     Festlegung steht unter Nutzervorbehalt (user_questions in
-     PO-2026-09-30-001); ändert der Nutzer sie, ändert sich nur dieser
-     Absatz, nicht Signatur oder Rückgabeform.
+     die Rand-Trigramme (`'  e'`, `' ei'`) und bleibt indexgestützt. Vom
+     Nutzer bestätigt (Rückfrage aus PO-2026-09-30-001, Option
+     „Wortanfänge bei 2 Zeichen, Teilwort ab 3").
    - Rang (`order by`, in dieser Reihenfolge):
      1. `prio`: `coalesce(source, 'manual') = 'manual' or is_corrected` zuerst
         (manuelle/korrigierte vor allen OFF-Foods).

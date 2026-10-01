@@ -1,6 +1,9 @@
 # ADR-0016: Offline-Puffer — client-vergebene Eintrags-UUID als Idempotenzschlüssel, IndexedDB-Queue in `core/`, neuer Bounded Context `offline-sync`
 
-- **Status**: accepted
+- **Status**: accepted; superseded by ADR-0021 (nur der Food-Schnappschuss
+  aus Punkt 8 — der lokale Food-Bestand ist ab dort primärer Suchbestand in
+  drei Teilen, nicht mehr „nur bei gescheiterter Abfrage gelesen"; alle
+  übrigen Punkte gelten fort)
 - **Datum**: 2026-09-22
 - **Bounded Context(s)**: `offline-sync` (neu), `diary`, `food-catalog`,
   `meals`, `app-shell`, `data-platform`
