@@ -1,5 +1,14 @@
 import {
   computeKcalFromMacros,
+  dedupeServerHits,
+  foodTextTier,
+  isSearchStatusReserved,
+  mergeLocalAndServer,
+  rankLocalFoods,
+  resolveSearchEmptyState,
+  resolveSearchStatus,
+  searchAnnouncement,
+  selectRecentFoods,
   computeLiveNutrition,
   filterFoodsByQuery,
   findPlausibilityFindings,
@@ -11,6 +20,7 @@ import {
   validateAmountField,
   validateNameField,
 } from './foods.calculations';
+import { SERVER_RESULT_LIMIT } from './food-search.constants';
 import type { Food } from './foods.service';
 
 function makeFood(overrides: Partial<Food> = {}): Food {
@@ -25,6 +35,7 @@ function makeFood(overrides: Partial<Food> = {}): Food {
     source: 'manual',
     barcode: null,
     isCorrected: false,
+    offPopularity: 0,
     ...overrides,
   };
 }
@@ -350,5 +361,199 @@ describe('computeKcalFromMacros (Eingabehilfe für Anlege-/Korrekturformular)', 
 
   it('does not depend on kcal100g at all (pure macro→energy conversion)', () => {
     expect(computeKcalFromMacros({ proteinG100g: 0, carbsG100g: 0, fatG100g: 0 })).toBe(0);
+  });
+});
+
+describe('selectRecentFoods', () => {
+  const foods = [makeFood({ id: '1' }), makeFood({ id: '2' }), makeFood({ id: '3' })];
+
+  it('keeps the order of the ids and skips unknown ones', () => {
+    expect(selectRecentFoods(foods, ['3', 'gone', '1']).map((f) => f.id)).toEqual(['3', '1']);
+  });
+});
+
+describe('foodTextTier (Textstufen wie search_foods, ADR-0020 Punkt 4)', () => {
+  it.each([
+    ['Joghurt', 'joghurt', 0],
+    ['Joghurt Natur', 'joghurt', 1],
+    ['Bio Joghurt', 'joghurt', 2],
+    ['Salat (Joghurt)', 'joghurt', 2],
+    ['Frucht-Joghurt', 'joghurt', 2],
+    ['Naturjoghurt', 'joghurt', 3],
+  ])('%s for "%s" is tier %i', (name, query, tier) => {
+    expect(foodTextTier(name, query)).toBe(tier);
+  });
+});
+
+describe('rankLocalFoods (ADR-0021 Punkt 11, eine Funktion für Step A und M2)', () => {
+  const none = new Map<string, number>();
+
+  it('returns nothing for an empty query', () => {
+    expect(rankLocalFoods([makeFood()], '   ', none)).toEqual([]);
+  });
+
+  it('puts manual/corrected foods before OFF foods, whatever the text tier', () => {
+    const foods = [
+      makeFood({ id: 'off-exact', name: 'Joghurt', source: 'off', offPopularity: 999 }),
+      makeFood({ id: 'manual-part', name: 'Naturjoghurt', source: 'manual' }),
+      makeFood({ id: 'corrected', name: 'Mein Joghurt', source: 'off', isCorrected: true }),
+    ];
+
+    expect(rankLocalFoods(foods, 'joghurt', none).map((f) => f.id)).toEqual([
+      'corrected',
+      'manual-part',
+      'off-exact',
+    ]);
+  });
+
+  it('then ranks by text tier, own use (descending), OFF popularity (descending), name, id', () => {
+    const foods = [
+      makeFood({ id: 'part', name: 'Naturjoghurt', source: 'off' }),
+      makeFood({ id: 'word', name: 'Bio Joghurt', source: 'off' }),
+      makeFood({ id: 'starts', name: 'Joghurt Natur', source: 'off' }),
+      makeFood({ id: 'used', name: 'Joghurt A', source: 'off' }),
+      makeFood({ id: 'popular', name: 'Joghurt B', source: 'off', offPopularity: 50 }),
+      makeFood({ id: 'plain-b', name: 'Joghurt C', source: 'off', offPopularity: 50 }),
+      makeFood({ id: 'plain-a', name: 'Joghurt C', source: 'off', offPopularity: 50 }),
+    ];
+
+    const ranked = rankLocalFoods(foods, 'joghurt', new Map([['used', 3]]));
+
+    expect(ranked.map((f) => f.id)).toEqual([
+      // Textstufe 1 (beginnt mit): erst eigene Nutzung, dann Beliebtheit, dann Name, dann id
+      'used',
+      'popular',
+      'plain-a',
+      'plain-b',
+      'starts',
+      // Stufe 2, Stufe 3
+      'word',
+      'part',
+    ]);
+  });
+
+  it('only returns foods that contain the query, case-insensitively', () => {
+    const foods = [makeFood({ id: '1', name: 'Apfel' }), makeFood({ id: '2', name: 'Banane' })];
+
+    expect(rankLocalFoods(foods, ' APF ', none).map((f) => f.id)).toEqual(['1']);
+  });
+});
+
+describe('dedupeServerHits / mergeLocalAndServer (ADR-0021 Punkt 11)', () => {
+  const hit = (food: Food) => ({ food, ownUseCount: 0 });
+
+  it('keeps the server order and drops hits whose id is already local', () => {
+    const local = [makeFood({ id: 'a' })];
+    const server = [hit(makeFood({ id: 'x' })), hit(makeFood({ id: 'a' })), hit(makeFood({ id: 'y' }))];
+
+    expect(dedupeServerHits(local, server).map((f) => f.id)).toEqual(['x', 'y']);
+  });
+
+  it('drops hits whose non-null barcode is already local, but never compares null barcodes', () => {
+    const local = [makeFood({ id: 'a', barcode: '4001' }), makeFood({ id: 'b', barcode: null })];
+    const server = [
+      hit(makeFood({ id: 'x', barcode: '4001' })),
+      hit(makeFood({ id: 'y', barcode: null })),
+    ];
+
+    expect(dedupeServerHits(local, server).map((f) => f.id)).toEqual(['y']);
+  });
+
+  it('applies the limit AFTER removing duplicates', () => {
+    const local = [makeFood({ id: 'dup' })];
+    const server = [
+      hit(makeFood({ id: 'dup' })),
+      ...Array.from({ length: 40 }, (_, i) => hit(makeFood({ id: `s${i}` }))),
+    ];
+
+    const result = dedupeServerHits(local, server);
+
+    expect(result).toHaveLength(SERVER_RESULT_LIMIT);
+    expect(result[0].id).toBe('s0');
+  });
+
+  it('merge puts local first and leaves their order untouched', () => {
+    const merged = mergeLocalAndServer([makeFood({ id: 'l1' }), makeFood({ id: 'l2' })], [makeFood({ id: 's1' })]);
+
+    expect(merged.map((f) => f.id)).toEqual(['l1', 'l2', 's1']);
+  });
+});
+
+describe('resolveSearchStatus (Priorität der Statuszeile)', () => {
+  it('1. local stock unavailable wins over everything — even for an empty query', () => {
+    expect(resolveSearchStatus({ localState: 'unavailable', queryLength: 0, serverPhase: 'idle' })).toEqual({
+      kind: 'local-unavailable',
+    });
+    expect(resolveSearchStatus({ localState: 'unavailable', queryLength: 5, serverPhase: 'offline' })).toEqual({
+      kind: 'local-unavailable',
+    });
+  });
+
+  it('2. offline, 3. server failed, 4. searching — one at a time', () => {
+    const base = { localState: 'ready' as const, queryLength: 3 };
+
+    expect(resolveSearchStatus({ ...base, serverPhase: 'offline' })).toEqual({ kind: 'offline' });
+    expect(resolveSearchStatus({ ...base, serverPhase: 'error' })).toEqual({ kind: 'server-failed' });
+    expect(resolveSearchStatus({ ...base, serverPhase: 'pending' })).toEqual({ kind: 'searching' });
+    expect(resolveSearchStatus({ ...base, serverPhase: 'success' })).toEqual({ kind: 'none' });
+  });
+
+  it('shows nothing below the minimum query length', () => {
+    expect(resolveSearchStatus({ localState: 'ready', queryLength: 1, serverPhase: 'offline' })).toEqual({
+      kind: 'none',
+    });
+  });
+
+  it('reserves the line from 2 characters or with an unavailable local stock', () => {
+    expect(isSearchStatusReserved({ localState: 'ready', queryLength: 1 })).toBe(false);
+    expect(isSearchStatusReserved({ localState: 'ready', queryLength: 2 })).toBe(true);
+    expect(isSearchStatusReserved({ localState: 'unavailable', queryLength: 0 })).toBe(true);
+  });
+});
+
+describe('searchAnnouncement', () => {
+  it('announces the count after a successful server search only', () => {
+    expect(searchAnnouncement('success', 4)).toBe('4 Treffer online');
+    expect(searchAnnouncement('success', 0)).toBe('Keine weiteren Treffer online');
+    expect(searchAnnouncement('pending', 4)).toBeNull();
+    expect(searchAnnouncement('error', 0)).toBeNull();
+  });
+});
+
+describe('resolveSearchEmptyState', () => {
+  const base = { localState: 'ready' as const, queryLength: 4, resultCount: 0 };
+
+  it('is null for an empty query and whenever rows exist', () => {
+    expect(resolveSearchEmptyState({ ...base, queryLength: 0, serverPhase: 'idle' })).toBeNull();
+    expect(resolveSearchEmptyState({ ...base, resultCount: 1, serverPhase: 'success' })).toBeNull();
+  });
+
+  it('waits for the server search to end (skeleton instead)', () => {
+    expect(resolveSearchEmptyState({ ...base, serverPhase: 'pending' })).toBeNull();
+  });
+
+  it('"Kein Treffer" after a successful server search', () => {
+    expect(resolveSearchEmptyState({ ...base, serverPhase: 'success' })).toEqual({
+      kind: 'no-hit',
+      minCharsHint: false,
+    });
+  });
+
+  it('"Keine lokalen Treffer" after a failed or skipped server search', () => {
+    expect(resolveSearchEmptyState({ ...base, serverPhase: 'error' })?.kind).toBe('no-local-hit');
+    expect(resolveSearchEmptyState({ ...base, serverPhase: 'offline' })?.kind).toBe('no-local-hit');
+  });
+
+  it('"Keine Treffer online" when the local stock is not loaded', () => {
+    expect(resolveSearchEmptyState({ ...base, localState: 'unavailable', serverPhase: 'error' })?.kind).toBe(
+      'no-online-hit',
+    );
+  });
+
+  it('adds the minimum-length hint for a single character without a local hit', () => {
+    expect(resolveSearchEmptyState({ ...base, queryLength: 1, serverPhase: 'idle' })).toEqual({
+      kind: 'no-hit',
+      minCharsHint: true,
+    });
   });
 });

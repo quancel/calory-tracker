@@ -3,7 +3,7 @@ import { ConnectivityService } from './connectivity.service';
 import { EntryQueueService, type QueueEntry } from './entry-queue.service';
 import { EntrySyncService, SYNC_RETRY_DELAY } from './entry-sync.service';
 import { EntriesService } from './entries.service';
-import { CoreFoodsService, type Food } from './foods.service';
+import { CoreFoodsService, FOODS_SNAPSHOT_SCHEMA, type Food } from './foods.service';
 import { LOCAL_DB_NAME, LocalDbService } from './local-db.service';
 import { SupabaseService } from './supabase.service';
 
@@ -28,6 +28,7 @@ function makeFood(overrides: Partial<Food> = {}): Food {
     source: 'manual',
     barcode: null,
     isCorrected: false,
+    offPopularity: 0,
     ...overrides,
   };
 }
@@ -406,6 +407,69 @@ describe('EntriesService.createEntry (ADR-0016 — client-vergebene ID, Offline-
     });
 
     expect(result).toEqual({ success: false, message: 'Eintrag konnte nicht gespeichert werden.' });
+  });
+
+  it('takes the snapshot for the buffer from the STORED local stock via findFood, not from what happens to be in memory (ADR-0021 Punkt 8)', async () => {
+    const insert = vi.fn();
+    const from = vi.fn().mockReturnValue({ insert });
+    configureModule({ from, online: false });
+    // Nur gespeichert, nicht im Speicher: `foods()` ist zum Aufrufzeitpunkt leer.
+    await TestBed.inject(LocalDbService).put(
+      'foods-snapshot',
+      {
+        schema: FOODS_SNAPSHOT_SCHEMA,
+        topN: 5000,
+        fingerprint: 'x',
+        foods: [makeFood({ id: 'stored-1', name: 'Aus IndexedDB' })],
+      },
+      'top',
+    );
+    const service = TestBed.inject(EntriesService);
+
+    const result = await service.createEntry({
+      foodId: 'stored-1',
+      amountG: 100,
+      mealType: 'lunch',
+      date: '2026-09-21',
+    });
+
+    expect(result).toEqual({ success: true });
+    expect(TestBed.inject(EntryQueueService).entries()[0].food).toEqual(
+      expect.objectContaining({ id: 'stored-1', name: 'Aus IndexedDB' }),
+    );
+  });
+
+  it('counts the use of the food after a successful insert and after a buffered one (recordUse)', async () => {
+    const insert = vi
+      .fn()
+      .mockResolvedValueOnce({ error: null, status: 201 })
+      .mockResolvedValue({ error: { code: '' }, status: 500 });
+    const from = vi.fn().mockReturnValue({ insert });
+    configureModule({ from });
+    await seedFoods([makeFood()]);
+    const service = TestBed.inject(EntriesService);
+    const core = TestBed.inject(CoreFoodsService);
+    const input = { foodId: 'f1', amountG: 100, mealType: 'lunch' as const, date: '2026-09-21' };
+
+    await service.createEntry(input);
+    expect(core.ownUseCounts().get('f1')).toBe(1);
+
+    await service.createEntry(input); // temporärer Fehler → gepuffert, zählt trotzdem
+    expect(core.ownUseCounts().get('f1')).toBe(2);
+
+    await TestBed.inject(EntrySyncService).runQueue();
+  });
+
+  it('does not count a use when the insert fails permanently', async () => {
+    const insert = vi.fn().mockResolvedValue({ error: { code: '23503' }, status: 409 });
+    const from = vi.fn().mockReturnValue({ insert });
+    configureModule({ from });
+    await seedFoods([makeFood()]);
+    const service = TestBed.inject(EntriesService);
+
+    await service.createEntry({ foodId: 'f1', amountG: 100, mealType: 'lunch', date: '2026-09-21' });
+
+    expect(TestBed.inject(CoreFoodsService).ownUseCounts().get('f1')).toBeUndefined();
   });
 });
 

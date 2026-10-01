@@ -19,6 +19,7 @@ function makeFood(overrides: Partial<Food> = {}): Food {
     source: 'manual',
     barcode: null,
     isCorrected: false,
+    offPopularity: 0,
     ...overrides,
   };
 }
@@ -46,13 +47,16 @@ function neutralValidation(): CreateFoodValidation {
 
 describe('FoodEntrySheetComponent', () => {
   let storeStub: {
-    loading: ReturnType<typeof signal>;
-    loadError: ReturnType<typeof signal>;
+    skeletonRows: ReturnType<typeof signal>;
+    searchStatus: ReturnType<typeof signal>;
+    searchStatusReserved: ReturnType<typeof signal>;
+    searchAnnouncement: ReturnType<typeof signal>;
+    localResultCount: ReturnType<typeof signal>;
+    emptyState: ReturnType<typeof signal>;
     query: ReturnType<typeof signal>;
     results: ReturnType<typeof signal>;
     isShowingRecent: ReturnType<typeof signal>;
     showNoRecentState: ReturnType<typeof signal>;
-    showEmptyState: ReturnType<typeof signal>;
     createForm: ReturnType<typeof signal>;
     createSaving: ReturnType<typeof signal>;
     createErrorMessage: ReturnType<typeof signal>;
@@ -97,7 +101,8 @@ describe('FoodEntrySheetComponent', () => {
     logMeal: ReturnType<typeof vi.fn>;
     resetForNextMealLog: ReturnType<typeof vi.fn>;
     ensureLoaded: ReturnType<typeof vi.fn>;
-    retryLoad: ReturnType<typeof vi.fn>;
+    retrySearch: ReturnType<typeof vi.fn>;
+    adoptFood: ReturnType<typeof vi.fn>;
     setQuery: ReturnType<typeof vi.fn>;
     beginCreate: ReturnType<typeof vi.fn>;
     setCreateField: ReturnType<typeof vi.fn>;
@@ -122,13 +127,16 @@ describe('FoodEntrySheetComponent', () => {
 
   function makeStoreStub() {
     return {
-      loading: signal(false),
-      loadError: signal<string | null>(null),
+      skeletonRows: signal(0),
+      searchStatus: signal<{ kind: string }>({ kind: 'none' }),
+      searchStatusReserved: signal(false),
+      searchAnnouncement: signal<string | null>(null),
+      localResultCount: signal(0),
+      emptyState: signal<{ kind: string; minCharsHint: boolean } | null>(null),
       query: signal(''),
       results: signal<Food[]>([]),
       isShowingRecent: signal(true),
       showNoRecentState: signal(false),
-      showEmptyState: signal(false),
       createForm: signal({
         name: '',
         kcal100g: '',
@@ -194,7 +202,8 @@ describe('FoodEntrySheetComponent', () => {
       logMeal: vi.fn().mockResolvedValue(true),
       resetForNextMealLog: vi.fn(),
       ensureLoaded: vi.fn().mockResolvedValue(undefined),
-      retryLoad: vi.fn().mockResolvedValue(undefined),
+      retrySearch: vi.fn().mockResolvedValue(undefined),
+      adoptFood: vi.fn(),
       setQuery: vi.fn(),
       beginCreate: vi.fn(),
       setCreateField: vi.fn(),
@@ -329,29 +338,84 @@ describe('FoodEntrySheetComponent', () => {
     expect(storeStub.setQuery).toHaveBeenCalledWith('Apfel');
   });
 
-  it('shows the loading skeleton', () => {
-    storeStub.loading.set(true);
+  it('shows the loading skeleton with the given number of rows', () => {
+    storeStub.skeletonRows.set(3);
     const fixture = TestBed.createComponent(FoodEntrySheetComponent);
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.querySelector('.state-loading')).toBeTruthy();
+    expect(fixture.nativeElement.querySelectorAll('.state-loading .skeleton-row')).toHaveLength(3);
   });
 
-  it('shows the error state with a retry action', () => {
-    storeStub.loadError.set('Foods konnten nicht geladen werden.');
+  it('shows the status line instead of an error block when the local stock is unavailable, and retries from there', () => {
+    storeStub.searchStatus.set({ kind: 'local-unavailable' });
+    storeStub.searchStatusReserved.set(true);
     const fixture = TestBed.createComponent(FoodEntrySheetComponent);
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.querySelector('.state-error').textContent).toContain(
-      'Foods konnten nicht geladen werden.',
+    expect(fixture.nativeElement.querySelector('app-search-status-line').textContent).toContain(
+      'Lokale Treffer nicht verfügbar',
     );
-    fixture.nativeElement.querySelector('.retry-button').click();
-    expect(storeStub.retryLoad).toHaveBeenCalledTimes(1);
+    expect(fixture.nativeElement.querySelector('.state-error')).toBeNull();
+    fixture.nativeElement.querySelector('app-search-status-line button').click();
+    expect(storeStub.retrySearch).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['no-hit', 'Kein Treffer für „Kiwi"'],
+    ['no-local-hit', 'Keine lokalen Treffer für „Kiwi"'],
+    ['no-online-hit', 'Keine Treffer online für „Kiwi"'],
+  ])('renders the %s empty text and keeps the create button', (kind, text) => {
+    storeStub.query.set('Kiwi');
+    storeStub.emptyState.set({ kind, minCharsHint: false });
+    const fixture = TestBed.createComponent(FoodEntrySheetComponent);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.empty-state').textContent).toContain(text);
+    expect(fixture.nativeElement.querySelector('.primary-button').textContent).toContain(
+      '„Kiwi" anlegen',
+    );
+  });
+
+  it('adds the "Online-Suche ab 2 Zeichen." hint for a single character', () => {
+    storeStub.query.set('k');
+    storeStub.emptyState.set({ kind: 'no-hit', minCharsHint: true });
+    const fixture = TestBed.createComponent(FoodEntrySheetComponent);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.empty-hint').textContent).toContain(
+      'Online-Suche ab 2 Zeichen.',
+    );
+  });
+
+  it('marks server rows (after the local ones) for the fade-in, without a separator or heading', () => {
+    storeStub.isShowingRecent.set(false);
+    storeStub.query.set('apf');
+    storeStub.localResultCount.set(1);
+    storeStub.results.set([makeFood({ id: 'local' }), makeFood({ id: 'server' })]);
+    const fixture = TestBed.createComponent(FoodEntrySheetComponent);
+    fixture.detectChanges();
+
+    const rows = fixture.nativeElement.querySelectorAll('.result-item');
+    expect(rows[0].classList.contains('result-item-appended')).toBe(false);
+    expect(rows[1].classList.contains('result-item-appended')).toBe(true);
+    expect(fixture.nativeElement.querySelector('.list-heading')).toBeNull();
+  });
+
+  it('adopts a listed food before opening Step C for it (a server hit is not in the local stock yet)', () => {
+    const markedFood = makeFood({ id: 'srv-1', kcal100g: 500, proteinG100g: 90, carbsG100g: 50, fatG100g: 10 });
+    storeStub.results.set([markedFood]);
+    const fixture = TestBed.createComponent(FoodEntrySheetComponent);
+    fixture.detectChanges();
+
+    fixture.nativeElement.querySelector('.marker-button').click();
+
+    expect(storeStub.adoptFood).toHaveBeenCalledWith(markedFood);
+    expect(storeStub.beginCorrect).toHaveBeenCalledWith('srv-1');
   });
 
   it('shows the empty state with a "{query} anlegen" primary action and switches to Step A2', () => {
     storeStub.query.set('Kiwi');
-    storeStub.showEmptyState.set(true);
+    storeStub.emptyState.set({ kind: 'no-hit', minCharsHint: false });
     const fixture = TestBed.createComponent(FoodEntrySheetComponent);
     fixture.detectChanges();
 
@@ -670,7 +734,7 @@ describe('FoodEntrySheetComponent', () => {
     beforeEach(() => {
       // simulate being on step A2 by triggering the "anlegen" flow through the empty state
       storeStub.query.set('Kiwi');
-      storeStub.showEmptyState.set(true);
+      storeStub.emptyState.set({ kind: 'no-hit', minCharsHint: false });
     });
 
     it('back-chevron returns to Step A', () => {

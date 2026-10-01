@@ -6,7 +6,10 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "off-import:generate": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/off-import/register-ts-resolve.mjs scripts/off-import/generate-off-seed.ts",
+    "off-import:typecheck": "tsc -p scripts/off-import/tsconfig.json",
+    "off-import:test": "vitest run --config scripts/off-import/vitest.config.ts"
   },
   "private": true,
   "packageManager": "npm@10.9.8",
@@ -27,6 +30,7 @@
     "@angular/build": "^22.1.8",
     "@angular/cli": "^22.1.8",
     "@angular/compiler-cli": "^22.1.0",
+    "@types/node": "~22.20.4",
     "fake-indexeddb": "^6.2.5",
     "jsdom": "^28.0.0",
     "prettier": "^3.8.1",

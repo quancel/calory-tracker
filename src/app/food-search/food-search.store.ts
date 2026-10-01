@@ -1,14 +1,16 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { EntriesService } from '../core/entries.service';
+import { RECENT_FOODS_LIMIT } from '../core/food-search.constants';
 import {
   computeKcalFromMacros,
   computeLiveNutrition,
-  filterFoodsByQuery,
   findPlausibilityFindings,
   resolveDefaultAmount,
+  selectRecentFoods,
   validateAmountField,
 } from '../core/foods.calculations';
 import { CoreFoodsService, type Food, type FoodSource } from '../core/foods.service';
+import { createHybridFoodSearch } from '../core/hybrid-food-search';
 import type { MealType } from '../core/meal-type.constants';
 import { computeMealTotals, sortMealsByName } from '../core/meals.calculations';
 import { CoreMealsService, type Meal } from '../core/meals.service';
@@ -18,13 +20,9 @@ import {
   cameraErrorMessage,
   foodToCorrectFormValues,
   nutritionDraftFromFormValues,
-  selectRecentFoods,
   validateCreateFoodForm,
 } from './food-search.calculations';
 import { FoodSearchService } from './food-search.service';
-
-/** Obergrenze der „Zuletzt verwendet"-Liste bei leerer Suche (statt des vollständigen Katalogs). */
-const RECENT_FOODS_LIMIT = 10;
 
 function emptyCreateForm(): CreateFoodFormValues {
   return {
@@ -78,12 +76,12 @@ export interface LoggedMealSummary {
 
 /**
  * Einzige Zustandsquelle von `food-catalog` für das Eingabe-Sheet
- * (ADR-0008). `providedIn: 'root'`, damit der Sitzungs-Cache über
- * mehrfaches Öffnen/Schließen des Sheets hinweg bestehen bleibt (Punkt 3):
- * `foods` wird nur beim allerersten `ensureLoaded()`-Aufruf einer Sitzung
- * geladen, jede Tastatureingabe danach filtert rein im Speicher über
- * `food-search.calculations.ts` (kein `ilike` je Tastendruck, kein
- * Debounce, kein Skeleton während des Tippens).
+ * (ADR-0008). `providedIn: 'root'`, damit der lokale Food-Bestand
+ * (`CoreFoodsService`, ADR-0021) über mehrfaches Öffnen/Schließen des Sheets
+ * hinweg bestehen bleibt. Die Suche läuft hybrid (ADR-0021 Punkt 10): lokale
+ * Treffer ab 1 Zeichen sofort, Server-Treffer ab 2 Zeichen nach Debounce —
+ * Zustand und Regeln stecken in `createHybridFoodSearch()`, dieser Store
+ * hält eine eigene Instanz.
  *
  * Seit Paket PO-2026-09-20-007 hält dieser Store zusätzlich den
  * Step-B-Zustand (Food, Menge, Mahlzeit, `entryId` — ADR-0009 Punkt 9):
@@ -109,7 +107,7 @@ export interface LoggedMealSummary {
  *
  * Seit Paket PO-2026-09-20-009 hält dieser Store zusätzlich den
  * Step-C-Zustand (Korrektur eines bestehenden Foods, ADR-0011 Punkt 6):
- * `beginCorrect()` sucht das Food im Sitzungs-Cache, `submitCorrect()`
+ * `beginCorrect()` sucht das Food im lokalen Bestand, `submitCorrect()`
  * schreibt über `FoodSearchService.updateFood()` und aktualisiert Cache
  * sowie einen ggf. aktiven Step-B-Entwurf in place. `correctFindings`
  * liefert die Plausibilitäts-/Vollständigkeitsbefunde für das Banner der
@@ -124,7 +122,7 @@ export class FoodSearchStore {
   private readonly coreFoodsService = inject(CoreFoodsService);
   private readonly coreMealsService = inject(CoreMealsService);
 
-  private readonly queryState = signal('');
+  private readonly search = createHybridFoodSearch();
   /** „Zuletzt verwendet"-IDs (jüngste zuerst), einmal je Sheet-Öffnen geladen (`ensureLoaded()`) — leer, solange noch nichts geloggt wurde oder das Laden fehlschlägt (dann bleibt die Suche trotzdem benutzbar). */
   private readonly recentFoodIdsState = signal<string[]>([]);
 
@@ -169,41 +167,54 @@ export class FoodSearchStore {
   private readonly loggingMealState = signal(false);
   private readonly loggedMealSummaryState = signal<LoggedMealSummary | null>(null);
 
-  /** `true` nur während des allerersten Ladevorgangs einer Sitzung (Skeleton-Bedingung) — delegiert an den zentralen Food-Cache (ADR-0012 Punkt 1). */
-  readonly loading = this.coreFoodsService.loading;
-  readonly loadError = this.coreFoodsService.loadError;
-  readonly query = this.queryState.asReadonly();
+  /** `true` nur während des ersten Ladens, solange noch gar kein lokales Food vorliegt (Skeleton-Bedingung, ADR-0021 Punkt 6). */
+  readonly loading = this.coreFoodsService.initialLoading;
+  readonly query = this.search.query;
+  /** Suchstatus-Zeile unter dem Suchfeld (design-conventions.md „Suchstatus-Zeile"). */
+  readonly searchStatus = this.search.status;
+  readonly searchStatusReserved = this.search.statusReserved;
+  readonly searchAnnouncement = this.search.announcement;
+  /** Anzahl lokaler Zeilen in `results` — Zeilen ab diesem Index sind Server-Treffer (Einblend-Animation, kein Zwischentitel). */
+  readonly localResultCount = computed(() => this.search.localResults().length);
   readonly createForm = this.createFormState.asReadonly();
   readonly createSaving = this.createSavingState.asReadonly();
   readonly createErrorMessage = this.createErrorState.asReadonly();
 
   /** `true` bei leerer Suche: dann zeigt `results` die „Zuletzt verwendet"-Liste statt des vollständigen Katalogs (der mit wachsendem Bestand unhandlich würde) — der Rest bleibt über die Suche erreichbar. */
-  readonly isShowingRecent = computed(() => this.queryState().trim() === '');
+  readonly isShowingRecent = computed(() => this.search.query().trim() === '');
 
+  /** Bei leerer Suche „Zuletzt verwendet", sonst lokale Treffer ++ Server-Treffer (ADR-0021 Punkt 11). */
   readonly results = computed(() => {
     if (this.isShowingRecent()) {
       return selectRecentFoods(this.coreFoodsService.foods(), this.recentFoodIdsState());
     }
-    return filterFoodsByQuery(this.coreFoodsService.foods(), this.queryState());
+    return this.search.results();
   });
 
   /** `true` nur bei leerer Suche UND leerer „Zuletzt verwendet"-Liste (z.B. noch nie etwas geloggt) — eigener, nicht-alarmierender Hinweis statt eines leeren Listenbereichs. */
   readonly showNoRecentState = computed(
     () =>
-      this.coreFoodsService.loaded() &&
-      !this.coreFoodsService.loading() &&
+      !this.coreFoodsService.initialLoading() &&
       this.isShowingRecent() &&
       this.results().length === 0,
   );
 
-  /** Leerzustand (design-conventions.md „Step A"): nur bei einer nicht-leeren Suche ohne Treffer, nie beim ersten Öffnen ohne Eingabe. */
-  readonly showEmptyState = computed(
-    () =>
-      this.coreFoodsService.loaded() &&
-      !this.coreFoodsService.loading() &&
+  /** Leerzustand (design-conventions.md „Zustände der Trefferliste"): `null`, solange Zeilen da sind, die Serversuche läuft oder die Suche leer ist. */
+  readonly emptyState = this.search.emptyState;
+  readonly showEmptyState = computed(() => this.search.emptyState() !== null);
+
+  /** Anzahl Skeleton-Zeilen: 3 beim ersten Laden ohne lokalen Bestand, 2 bei laufender Serversuche ohne lokalen Treffer, sonst 0. */
+  readonly skeletonRows = computed(() => {
+    if (this.coreFoodsService.initialLoading() && this.results().length === 0) return 3;
+    if (
       !this.isShowingRecent() &&
-      this.results().length === 0,
-  );
+      this.search.serverPhase() === 'pending' &&
+      this.results().length === 0
+    ) {
+      return 2;
+    }
+    return 0;
+  });
 
   readonly createValidation = computed(() => validateCreateFoodForm(this.createFormState()));
   readonly canCreate = computed(
@@ -290,12 +301,12 @@ export class FoodSearchStore {
   );
 
   /**
-   * Lädt den Food-Bestand genau einmal je Sitzung — delegiert an den
-   * zentralen Food-Cache (ADR-0012 Punkt 1, ehemals ADR-0008 Punkt 3).
-   * Erneuter Aufruf ohne `retryLoad()` ist ein No-op für den Katalog.
+   * Baut den lokalen Food-Bestand genau einmal je Sitzung auf — delegiert an
+   * `CoreFoodsService` (ADR-0021 Punkt 6). Erneuter Aufruf ist ein No-op für
+   * den Bestand.
    *
    * Die „Zuletzt verwendet"-Liste wird dagegen bei JEDEM Sheet-Öffnen neu
-   * geladen (kein Sitzungs-Cache) — sie soll auch widerspiegeln, was seit
+   * geladen (kein Cache-Bestand) — sie soll auch widerspiegeln, was seit
    * dem letzten Öffnen geloggt wurde.
    */
   async ensureLoaded(): Promise<void> {
@@ -310,9 +321,9 @@ export class FoodSearchStore {
     this.recentFoodIdsState.set(ids);
   }
 
-  /** Erneuter Ladeversuch nach einem Fehler (Retry-Button im Fehlerzustand). */
-  async retryLoad(): Promise<void> {
-    await this.coreFoodsService.retryLoad();
+  /** „Erneut versuchen" der Statuszeile: lädt den Lokalbestand nach bzw. wiederholt die Serversuche (je nach angezeigtem Status). */
+  async retrySearch(): Promise<void> {
+    await this.search.retry();
   }
 
   setActiveTab(tab: StepATab): void {
@@ -368,13 +379,18 @@ export class FoodSearchStore {
   }
 
   setQuery(value: string): void {
-    this.queryState.set(value);
+    this.search.setQuery(value);
+  }
+
+  /** Übernimmt ein Food aus der Trefferliste (lokal oder Server-Treffer) in den Nutzer-Teil des lokalen Bestands — Voraussetzung für Korrektur (Step C) und Offline-Puffer (ADR-0021 Punkt 2/8). */
+  adoptFood(food: Food): void {
+    this.coreFoodsService.upsertFood(food);
   }
 
   /** Bereitet Step A2 vor: Name mit dem aktuellen Suchbegriff vorbelegt, übrige Felder leer (design-conventions.md „Step A2"). */
   beginCreate(): void {
     this.createErrorState.set(null);
-    this.createFormState.set({ ...emptyCreateForm(), name: this.queryState().trim() });
+    this.createFormState.set({ ...emptyCreateForm(), name: this.search.query().trim() });
   }
 
   setCreateField<K extends keyof CreateFoodFormValues>(key: K, value: string): void {
@@ -382,7 +398,7 @@ export class FoodSearchStore {
   }
 
   /**
-   * Legt das Food an und fügt es bei Erfolg in den Sitzungs-Cache ein,
+   * Legt das Food an und fügt es bei Erfolg in den lokalen Bestand ein,
    * statt die Liste neu zu laden (ADR-0008 Punkt 3). `null` bei
    * ungültiger Eingabe (defensive guard, Submit-Button ist ohnehin
    * disabled) oder Server-Fehler (`createErrorMessage` zeigt die Meldung).
@@ -413,8 +429,9 @@ export class FoodSearchStore {
 
   /**
    * Bereitet Step C (Korrektur, ADR-0011 Punkt 6) vor: sucht das Food im
-   * Sitzungs-Cache (`ensureLoaded()` lädt bei Sheet-Öffnen den gesamten
-   * Katalog, ADR-0008 Punkt 3 — das Food ist im Normalfall bereits dort).
+   * lokalen Bestand. Ein Server-Treffer liegt dort erst, nachdem er per
+   * `adoptFood()` übernommen wurde (ADR-0021 Punkt 8) — der Aufrufer tut das
+   * vor `beginCorrect()`.
    * Fallback auf den aktuellen Step-B-Entwurf, falls der Cache beim
    * Bearbeiten-Flow (`entryId`-Route) noch nicht geladen ist, wenn der
    * Nutzer das Bleistift-Icon antippt — `defaultPortionG`/`barcode` sind in
@@ -446,7 +463,7 @@ export class FoodSearchStore {
   /**
    * Speichert Step C (ADR-0011 Punkt 6) über `FoodSearchService.updateFood`
    * — schreibt Nährwerte/Name/Standardportion/Barcode UND `is_corrected =
-   * true` im selben Statement. Aktualisiert bei Erfolg den Sitzungs-Cache
+   * true` im selben Statement. Aktualisiert bei Erfolg den lokalen Bestand
    * IN PLACE (kein Neuladen, ADR-0011 Punkt 6) und, falls das korrigierte
    * Food gerade in Step B aktiv ist, auch `stepBFoodState` — damit
    * `liveNutrition` sofort die neuen Werte zeigt, ohne dass der Nutzer neu
@@ -492,7 +509,7 @@ export class FoodSearchStore {
    * Bereitet eine neue Sheet-Sitzung vor (ADR-0009 Punkt 9): setzt den
    * kompletten Step-B- und Scan-Zustand zurück (Food, Menge, entryId,
    * Lade-/Speicher-/Löschfehler, Scan-Phase, Serien-Zähler) und übernimmt
-   * Tag + Mahlzeit aus den Sheet-Routenparametern. Der Food-Sitzungs-Cache
+   * Tag + Mahlzeit aus den Sheet-Routenparametern. Der lokale Food-Bestand
    * (`CoreFoodsService`, ADR-0012 Punkt 1) bleibt davon unberührt. Aufgerufen von
    * `FoodEntrySheetComponent.ngOnInit()` bei jedem Sheet-Öffnen — der
    * Store ist `providedIn: 'root'` und überlebt das Schließen des Sheets.
@@ -536,11 +553,13 @@ export class FoodSearchStore {
 
   /**
    * Tap auf eine Trefferzeile (Step A → Step B, ADR-0009 Punkt 1). Übernimmt
-   * das gewählte Food unverändert aus dem Sitzungs-Cache (keine erneute
-   * Katalogabfrage) und belegt die Menge mit `defaultPortionG`, sonst `100`
+   * das gewählte Food unverändert aus der Trefferliste (lokal oder
+   * Server-Treffer, bei Auswahl in den lokalen Bestand übernommen, ADR-0021
+   * Punkt 8) und belegt die Menge mit `defaultPortionG`, sonst `100`
    * (ADR-0009 Punkt 10, reine UI-Vorbelegung, nie zurückgeschrieben).
    */
   selectFood(food: Food): void {
+    this.adoptFood(food);
     this.entryOriginState.set('search');
     this.stepBFoodState.set(food);
     this.amountInputState.set(resolveDefaultAmount(food));
@@ -672,7 +691,7 @@ export class FoodSearchStore {
    * erneuten Aufruf, während bereits ein Lookup läuft (doppelte
    * Erkennung desselben Frames). Setzt je nach Ergebnis `scanPhase`:
    * `'resolved'` (Step B vorbelegt, lokal ODER vollständiger OFF-Treffer,
-   * bereits in den Sitzungs-Cache eingefügt), `'prefill-create'`
+   * bereits in den lokalen Bestand eingefügt), `'prefill-create'`
    * (Step A2 vorbelegt, OFF unvollständig — Nährwerte bleiben leer),
    * `'not-found'` oder `'api-error'` (Fehlertext, kein Treffer bzw.
    * Netzwerk-/API-Fehler unterschieden, Akzeptanz).
@@ -689,7 +708,7 @@ export class FoodSearchStore {
     switch (result.status) {
       case 'found':
       case 'off-complete':
-        this.insertIntoCacheIfMissing(result.food);
+        this.coreFoodsService.upsertFood(result.food);
         this.entryOriginState.set('scan');
         this.stepBFoodState.set(result.food);
         this.amountInputState.set(resolveDefaultAmount(result.food));
@@ -738,11 +757,6 @@ export class FoodSearchStore {
     this.stepBSavingState.set(false);
     this.lastSavedSummaryState.set(null);
     this.beginScanSession();
-  }
-
-  private insertIntoCacheIfMissing(food: Food): void {
-    if (this.coreFoodsService.foods().some((existing) => existing.id === food.id)) return;
-    this.coreFoodsService.upsertFood(food);
   }
 
   private async loadSavedMeals(): Promise<void> {

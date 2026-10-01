@@ -141,6 +141,123 @@ anlegen" oben) — RLS-Policies und Fremdschlüssel referenzieren `auth.users`.
 Alternativ, mit lokal installierter Supabase-CLI: `supabase db push`. Das ist
 optional und kein Projekt-Standard.
 
+### Prüfabfragen (`supabase/checks/`)
+
+Zu einer Migration kann es eine Prüfdatei mit gleichem Zeitstempel unter
+`supabase/checks/` geben. Sie ist **keine Migration** und wird nicht unter
+`migrations/` abgelegt; sie läuft rein lesend bzw. in `begin … rollback` und
+wird bei Bedarf im SQL Editor ausgeführt.
+
+- `supabase/checks/20260930090000_foods_search_explain.sql` — gehört zur
+  Suche (`search_foods`/`top_foods`, `foods.off_popularity`, ADR-0020):
+  `explain (analyze, buffers)` des Kandidaten-Prädikats für `'joghurt'` und
+  `'ei'`, jeweils regulär und mit `enable_seqscan = off`, dazu Kontroll-
+  `select`s und die Größen von Tabelle und Indizes. Erwartung: Nach dem
+  Import (~300k Zeilen) zeigt der reguläre Lauf einen `Bitmap Index Scan on
+  foods_name_trgm_idx`; vor dem Import wählt der Planer wegen der kleinen
+  Tabelle zu Recht einen `Seq Scan`, der zweite Lauf zeigt dann, dass der
+  Index benutzbar ist. Im SQL Editor läuft die Datei als `postgres` ohne
+  RLS — `own_use_count` ist dort immer 0.
+
+## Lebensmittel-Import (Open Food Facts, DACH)
+
+Der Bestand `foods` lässt sich einmalig mit Produkten aus Open Food Facts (OFF)
+für Deutschland, Österreich und die Schweiz befüllen (ADR-0022). Das Werkzeug
+`scripts/off-import/` läuft **lokal und offline** (kein Netzzugriff, keine
+Zugangsdaten), liest den OFF-Bulk-Export und erzeugt SQL-Dateien („Chargen"),
+die du anschließend selbst in die Datenbank einspielst.
+
+**Bezugsquelle und Lizenz.** Open Food Facts, Export
+`openfoodfacts-products.jsonl.gz` (mehrere GB, Stand: der Tag des Downloads):
+<https://static.openfoodfacts.org/data/openfoodfacts-products.jsonl.gz>.
+Die Daten stehen unter der Open Database License (ODbL 1.0), die einzelnen
+Inhalte unter der Database Contents License (DbCL 1.0); Quelle und Lizenz
+stehen im Kopf jeder Chargen-Datei. Die erzeugten Chargen werden **nicht
+committet** (`/supabase/data/` ist gitignored): Sie wachsen je OFF-Stand um
+~30–60 MB, und eine öffentlich veröffentlichte abgeleitete OFF-Datenbank
+unterläge den Share-Alike-Pflichten der ODbL.
+
+**Voraussetzung:** Node aus `.nvmrc` (22.23.1; das Skript nutzt Type Stripping
+ohne Transpiler und braucht ≥ 22.18), `npm install` (einzige Neuerung ist
+`@types/node` als devDependency für die Typprüfung).
+
+**Reihenfolge — bitte einhalten:**
+
+1. **Migration** `supabase/migrations/20260930090000_foods_search_trgm_popularity.sql`
+   einspielen (Abschnitt „Datenbank/Migrationen"). Ohne sie bricht jede Charge
+   mit einem Fehler ab und schreibt nichts.
+2. **App ausliefern** mit der Hybrid-Suche (Paket 003) **und** dem
+   Scan-Lookup über kanonische Barcodes (Paket 002-fe). Erst dann findet der
+   Scan die importierten Produkte (der Import schreibt Barcodes in der
+   kanonischen Form aus `normalizeBarcode`).
+3. **Chargen erzeugen und einspielen** (unten).
+
+**Chargen erzeugen:**
+
+```bash
+npm run off-import:generate -- --input <pfad>/openfoodfacts-products.jsonl.gz
+```
+
+Der Export wird gestreamt (kein Entpacken auf die Platte); der Lauf dauert je
+nach Rechner einige Minuten. Ausgabe: `supabase/data/off-dach/off-dach-0001.sql`
+usw., 5000 Zeilen je Datei, beliebteste Produkte (`unique_scans_n`) zuerst.
+Gleiche Eingabe ergibt byte-gleiche Dateien; frühere `off-dach-NNNN.sql` im
+Ausgabeordner werden vor dem Schreiben entfernt. Am Ende steht eine Statistik
+auf stdout (gelesen, nicht DACH, verworfen nach Grund, übernommen, Dubletten,
+Anzahl Chargen). Optionen: `--out <verzeichnis>`; `--tolerate-truncated` für
+eine abgeschnittene `.gz`-Datei (nur für Stichproben, nicht für den echten
+Import).
+
+Übernommen wird ein Produkt nur, wenn es ein DACH-Land (`countries_tags`),
+einen gültigen Barcode, einen Namen, alle vier `_100g`-Nährwerte (kcal, Protein,
+Kohlenhydrate, Fett) hat **und** die Plausibilitätsprüfung der App besteht
+(Energie weicht ≤ 10 % von der Atwater-Rechnung ab, Makrosumme ≤ 100 g;
+dieselben Regeln wie beim Scan, per Import aus dem App-Code). Produkte mit
+Alkohol oder Zuckeralkoholen fallen dadurch häufig heraus. Der Name lautet
+„Produktname (Marke)", deutscher Name bevorzugt.
+
+**Einspielen** — in einer Schleife, die beim ersten Fehler anhält. Als
+Verbindung den Postgres-Connection-String des Supabase-Projekts verwenden
+(Dashboard → **Project Settings** → **Database**, Direct connection oder
+Session pooler; Passwort nicht ins Repo):
+
+```bash
+export DATABASE_URL='postgresql://postgres:<passwort>@<host>:5432/postgres'
+for f in supabase/data/off-dach/off-dach-*.sql; do
+  echo "== $f"
+  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f" || break
+done
+```
+
+Jede Charge ist eine eigene Transaktion mit einem einzigen Statement, reine
+DML auf `public.foods`, und beliebig oft einspielbar: Ein bereits vorhandenes
+Food (auch mit Barcode in älterer Schreibweise, auch manuell korrigiert) bleibt
+bis auf `off_popularity` unverändert; Dubletten entstehen nicht. Nach einem
+Abbruch genügt es, die Schleife erneut zu starten. Alternativ lässt sich eine
+Datei im Supabase-SQL-Editor ausführen (jede Datei ist wenige MB groß).
+
+**Speicherbedarf (Schätzung, nicht gemessen).** Bei ~300.000 Zeilen etwa
+55 MB Tabelle, 40 MB Trigram-Index und 25 MB übrige Indizes, zusammen rund
+120 MB von 500 MB im Free Plan. Das tatsächliche Ergebnis prüfst du nach dem
+Import mit den Größenabfragen aus `supabase/checks/20260930090000_foods_search_explain.sql`
+oder direkt:
+
+```sql
+select count(*) as zeilen, count(*) filter (where off_popularity > 0) as mit_scans
+from public.foods;
+
+select pg_size_pretty(pg_table_size('public.foods'))           as tabelle,
+       pg_size_pretty(pg_indexes_size('public.foods'))         as indizes,
+       pg_size_pretty(pg_relation_size('public.foods_name_trgm_idx')) as trigram_index,
+       pg_size_pretty(pg_database_size(current_database()))    as datenbank_gesamt;
+```
+
+Ein neuer OFF-Stand wird mit demselben Ablauf eingespielt: neue Produkte
+kommen hinzu, bestehende bleiben, nur `off_popularity` wird aktualisiert.
+
+**Tests des Werkzeugs:** `npm run off-import:test` (Vitest, getrennt von
+`npm test`) und `npm run off-import:typecheck`.
+
 ## Projektstruktur
 
 Feature-Ordner direkt unter `src/app/<feature>/` (auth, diary,

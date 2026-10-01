@@ -12,15 +12,21 @@ import { Injectable } from '@angular/core';
  * - `ENTRY_QUEUE_STORE` (`entry-queue.service.ts`): Puffer-Queue, `keyPath: 'id'`.
  * - `DAY_SNAPSHOT_STORE` (`diary/diary.service.ts`): Lesecache des zuletzt
  *   geladenen Tages + Zielzeile, fester Schlüssel (ADR-0016 Punkt 8).
- * - `FOODS_SNAPSHOT_STORE` (`core/foods.service.ts`): Lesecache des zuletzt
- *   geladenen Food-Bestands, fester Schlüssel (ADR-0016 Punkt 8).
+ * - `FOODS_SNAPSHOT_STORE` (`core/foods.service.ts`): lokaler Food-Bestand in
+ *   drei Teilen unter den Schlüsseln `'top'`, `'shared'`, `'user:<userId>'`
+ *   (ADR-0021 Punkt 3, löst den Schlüssel `'current'` aus ADR-0016 Punkt 8 ab).
  *
  * Reine Low-Level-Kapsel (get/getAll/put/delete) — Fachlogik (was
  * gespeichert wird, wann gelesen wird) bleibt bei den Aufrufern.
  */
 
 export const LOCAL_DB_NAME = 'calory-tracker-offline';
-export const LOCAL_DB_VERSION = 1;
+/**
+ * Version 2 (ADR-0021 Punkt 3): `foods-snapshot` hält statt eines Schlüssels
+ * `'current'` jetzt die Teile `'top'`, `'shared'`, `'user:<userId>'`; das
+ * Upgrade von 1 leert den Store (alte `Food`-Form).
+ */
+export const LOCAL_DB_VERSION = 2;
 
 export const ENTRY_QUEUE_STORE = 'entry-queue';
 export const DAY_SNAPSHOT_STORE = 'day-snapshot';
@@ -35,8 +41,9 @@ export class LocalDbService {
       this.dbPromise = new Promise<IDBDatabase>((resolve, reject) => {
         const request = indexedDB.open(LOCAL_DB_NAME, LOCAL_DB_VERSION);
 
-        request.onupgradeneeded = () => {
+        request.onupgradeneeded = (event) => {
           const db = request.result;
+          const upgradeTx = request.transaction;
           if (!db.objectStoreNames.contains(ENTRY_QUEUE_STORE)) {
             db.createObjectStore(ENTRY_QUEUE_STORE, { keyPath: 'id' });
           }
@@ -45,6 +52,9 @@ export class LocalDbService {
           }
           if (!db.objectStoreNames.contains(FOODS_SNAPSHOT_STORE)) {
             db.createObjectStore(FOODS_SNAPSHOT_STORE);
+          } else if (event.oldVersion < 2 && upgradeTx) {
+            // ADR-0021 Punkt 3: der alte `'current'`-Schnappschuss hat die alte Food-Form.
+            upgradeTx.objectStore(FOODS_SNAPSHOT_STORE).clear();
           }
         };
         request.onsuccess = () => resolve(request.result);
@@ -68,6 +78,15 @@ export class LocalDbService {
     return new Promise<T | undefined>((resolve, reject) => {
       const request = db.transaction(store, 'readonly').objectStore(store).get(key);
       request.onsuccess = () => resolve(request.result as T | undefined);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async getAllKeys(store: string): Promise<IDBValidKey[]> {
+    const db = await this.open();
+    return new Promise<IDBValidKey[]>((resolve, reject) => {
+      const request = db.transaction(store, 'readonly').objectStore(store).getAllKeys();
+      request.onsuccess = () => resolve(request.result ?? []);
       request.onerror = () => reject(request.error);
     });
   }

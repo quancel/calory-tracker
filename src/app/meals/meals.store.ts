@@ -1,6 +1,13 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { validateAmountField, validateNameField } from '../core/foods.calculations';
+import { EntriesService } from '../core/entries.service';
+import { RECENT_FOODS_LIMIT } from '../core/food-search.constants';
+import {
+  selectRecentFoods,
+  validateAmountField,
+  validateNameField,
+} from '../core/foods.calculations';
 import { CoreFoodsService, type Food } from '../core/foods.service';
+import { createHybridFoodSearch } from '../core/hybrid-food-search';
 import { CoreMealsService, type Meal } from '../core/meals.service';
 import { computeMealTotals, sortMealsByName } from '../core/meals.calculations';
 import { MealsService } from './meals.service';
@@ -22,8 +29,9 @@ export type AmountEditMode = { kind: 'add' } | { kind: 'change'; index: number }
 /**
  * Einzige Zustandsquelle von `meals` (Verwaltungsansicht + Mahlzeit-Sheet
  * M1/M2/M3, ADR-0012). Lesepfad der Mahlzeitenliste über
- * `CoreMealsService`, Food-Auswahl in M2 über `CoreFoodsService` (beide
- * `core/`, kein Import aus `food-catalog`). Schreiben ausschließlich über
+ * `CoreMealsService`, Food-Auswahl in M2 über `CoreFoodsService` und die
+ * gemeinsame Hybrid-Suche `createHybridFoodSearch()` (alle `core/`, kein
+ * Import aus `food-catalog`). Schreiben ausschließlich über
  * `MealsService` (dieses Feature).
  *
  * Der Sheet-Entwurf (Name, Positionen) ist reiner Client-State, der erst
@@ -35,6 +43,7 @@ export type AmountEditMode = { kind: 'add' } | { kind: 'change'; index: number }
 export class MealsStore {
   private readonly coreMealsService = inject(CoreMealsService);
   private readonly coreFoodsService = inject(CoreFoodsService);
+  private readonly entriesService = inject(EntriesService);
   private readonly mealsService = inject(MealsService);
 
   // --- Verwaltungsliste ---
@@ -91,16 +100,46 @@ export class MealsStore {
   );
 
   // --- M2: Food-Suche (nur bestehende Foods, kein Anlegen/Scan — Nutzerentscheidung 2026-09-21) ---
-  private readonly m2QueryState = signal('');
-  readonly m2Query = this.m2QueryState.asReadonly();
+  // Hybrid wie Step A (ADR-0021 Punkt 10); bei LEERER Suche „Zuletzt verwendet"
+  // (Nutzerentscheidung 2026-09-30), nicht der ganze lokale Bestand.
+  private readonly m2Search = createHybridFoodSearch();
+  private readonly m2RecentFoodIdsState = signal<string[]>([]);
+
+  readonly m2Query = this.m2Search.query;
+  /** `true` bei leerer Suche: dann zeigt `m2Results` die „Zuletzt verwendet"-Liste. */
+  readonly m2ShowingRecent = computed(() => this.m2Search.query().trim() === '');
   readonly m2Results = computed(() => {
-    const normalized = this.m2QueryState().trim().toLowerCase();
-    const foods = this.coreFoodsService.foods();
-    if (normalized === '') return foods;
-    return foods.filter((food) => food.name.toLowerCase().includes(normalized));
+    if (this.m2ShowingRecent()) {
+      return selectRecentFoods(this.coreFoodsService.foods(), this.m2RecentFoodIdsState());
+    }
+    return this.m2Search.results();
   });
-  readonly foodsLoading = this.coreFoodsService.loading;
-  readonly foodsLoadError = this.coreFoodsService.loadError;
+  /** Anzahl lokaler Zeilen in `m2Results` — Zeilen ab diesem Index sind Server-Treffer. */
+  readonly m2LocalResultCount = computed(() => this.m2Search.localResults().length);
+  readonly m2SearchStatus = this.m2Search.status;
+  readonly m2SearchStatusReserved = this.m2Search.statusReserved;
+  readonly m2SearchAnnouncement = this.m2Search.announcement;
+  /** Leerzustand von M2 (nur die Zeile, kein Anlegen-Button): `null`, solange Zeilen da sind oder die Serversuche läuft. */
+  readonly m2EmptyState = this.m2Search.emptyState;
+  /** Bei leerer Suche und leerer „Zuletzt verwendet"-Liste: nicht-alarmierender Hinweis wie in Step A. */
+  readonly m2ShowNoRecent = computed(
+    () =>
+      !this.coreFoodsService.initialLoading() &&
+      this.m2ShowingRecent() &&
+      this.m2Results().length === 0,
+  );
+  /** Skeleton: 2 Zeilen beim ersten Laden ohne lokalen Bestand bzw. bei laufender Serversuche ohne lokalen Treffer. */
+  readonly m2SkeletonRows = computed(() => {
+    if (this.coreFoodsService.initialLoading() && this.m2Results().length === 0) return 2;
+    if (
+      !this.m2ShowingRecent() &&
+      this.m2Search.serverPhase() === 'pending' &&
+      this.m2Results().length === 0
+    ) {
+      return 2;
+    }
+    return 0;
+  });
 
   // --- M3: Menge (Hinzufügen oder Ändern) ---
   private readonly m3FoodState = signal<Food | null>(null);
@@ -125,12 +164,19 @@ export class MealsStore {
     await this.loadList();
   }
 
+  /** Baut den lokalen Bestand auf (einmal je Sitzung) und lädt die „Zuletzt verwendet"-Liste neu (bei jedem Öffnen, wie in Step A). */
   async ensureFoodsLoaded(): Promise<void> {
-    await this.coreFoodsService.ensureLoaded();
+    await Promise.all([this.coreFoodsService.ensureLoaded(), this.loadRecentFoodIds()]);
   }
 
-  retryFoodsLoad(): Promise<void> {
-    return this.coreFoodsService.retryLoad();
+  /** „Erneut versuchen" der Statuszeile in M2. */
+  async retryM2Search(): Promise<void> {
+    await this.m2Search.retry();
+  }
+
+  private async loadRecentFoodIds(): Promise<void> {
+    const ids = await this.entriesService.loadRecentFoodIds(RECENT_FOODS_LIMIT);
+    this.m2RecentFoodIdsState.set(ids);
   }
 
   /** Bereitet M1 für „neu anlegen" vor (leer). */
@@ -179,19 +225,20 @@ export class MealsStore {
   }
 
   setM2Query(value: string): void {
-    this.m2QueryState.set(value);
+    this.m2Search.setQuery(value);
   }
 
   /** „Food hinzufügen" → M2 → M3 im Hinzufügen-Modus. */
   beginAddItem(): void {
-    this.m2QueryState.set('');
+    this.m2Search.setQuery('');
     this.m3ModeState.set({ kind: 'add' });
     this.m3FoodState.set(null);
     this.m3AmountInputState.set('');
   }
 
-  /** Tap auf eine M2-Trefferzeile: übernimmt das Food, belegt die Menge mit `defaultPortionG`/100 vor. */
+  /** Tap auf eine M2-Trefferzeile: übernimmt das Food (auch einen Server-Treffer) in den lokalen Bestand, belegt die Menge mit `defaultPortionG`/100 vor. */
   selectM2Food(food: Food): void {
+    this.coreFoodsService.upsertFood(food);
     this.m3FoodState.set(food);
     this.m3AmountInputState.set(food.defaultPortionG !== null ? `${food.defaultPortionG}` : '100');
   }
@@ -218,6 +265,7 @@ export class MealsStore {
       source: 'manual',
       barcode: null,
       isCorrected: false,
+      offPopularity: 0,
     });
     this.m3AmountInputState.set(`${item.amountG}`);
   }

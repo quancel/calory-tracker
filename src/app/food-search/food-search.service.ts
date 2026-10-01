@@ -7,11 +7,8 @@ import {
   type CreateFoodFormValues,
 } from './food-search.calculations';
 import { FoodSearchOffService } from './food-search.off.service';
-import type { Food, FoodSource } from '../core/foods.service';
+import { FOOD_COLUMNS, type Food, type FoodSource, type RawFoodRow, toFood } from '../core/foods.service';
 import type { CreateFoodInput } from './models/food.model';
-
-export type SearchFoodsResult =
-  { success: true; foods: Food[] } | { success: false; message: string };
 
 export type CreateFoodResult = { success: true; food: Food } | { success: false; message: string };
 
@@ -38,44 +35,12 @@ export type BarcodeLookupResult =
   | { status: 'not-found' }
   | { status: 'error'; message: string };
 
-interface RawFoodRow {
-  id: string;
-  name: string;
-  kcal_100g: number;
-  protein_100g: number;
-  carbs_100g: number;
-  fat_100g: number;
-  default_portion_g: number | null;
-  source: FoodSource | null;
-  barcode: string | null;
-  is_corrected: boolean;
-}
-
-const FOOD_COLUMNS =
-  'id, name, kcal_100g, protein_100g, carbs_100g, fat_100g, default_portion_g, source, barcode, is_corrected';
-
-function toFood(raw: RawFoodRow): Food {
-  return {
-    id: raw.id,
-    name: raw.name,
-    kcal100g: raw.kcal_100g,
-    proteinG100g: raw.protein_100g,
-    carbsG100g: raw.carbs_100g,
-    fatG100g: raw.fat_100g,
-    defaultPortionG: raw.default_portion_g,
-    source: raw.source ?? 'manual',
-    barcode: raw.barcode,
-    isCorrected: raw.is_corrected,
-  };
-}
-
 /**
  * Schreibweg auf `foods` ("FoodRepository", ADR-0008 Punkt 2) sowie
  * einziger Zugang zu Open Food Facts und zum Barcode-Lookup. Der
- * Katalog-Lesepfad/Sitzungs-Cache liegt seit Paket 010 in
- * `core/foods.service.ts` (ADR-0012 Punkt 1) — `food-search.store.ts` ruft
- * dafür nicht mehr `search()` auf dieser Datei, sondern
- * `CoreFoodsService.ensureLoaded()`. Seit Paket 008 kapselt diese Datei
+ * Lesepfad (lokaler Bestand, Top-/Serversuche) liegt in
+ * `core/foods.service.ts` (ADR-0012 Punkt 1, ADR-0021) — ein ungefilterter
+ * Listenpfad existiert hier nicht (mehr). Seit Paket 008 kapselt diese Datei
  * zusätzlich die Reihenfolge der Quellen für den Barcode-Scan (lokal → Open
  * Food Facts → manuelles Anlegen, ADR-0010 Punkt 4): `food-search.off.service.ts`
  * wird ausschließlich von hier aus aufgerufen.
@@ -87,25 +52,6 @@ function toFood(raw: RawFoodRow): Food {
 export class FoodSearchService {
   private readonly supabase = inject(SupabaseService);
   private readonly offService = inject(FoodSearchOffService);
-
-  /**
-   * Lädt den lokalen Food-Bestand, quellenunabhängig. Bleibt aus
-   * API-Kompatibilitätsgründen erhalten, wird aber seit Paket 010
-   * (ADR-0012 Punkt 1) operativ nicht mehr aufgerufen — der Katalog-
-   * Lesepfad läuft über `core/foods.service.ts`. `query` wird bewusst
-   * NICHT serverseitig ausgewertet (ADR-0008 Punkt 3: kein `ilike` je
-   * Tastendruck).
-   */
-  async search(_query: string): Promise<SearchFoodsResult> {
-    const response = await this.supabase.client.from('foods').select(FOOD_COLUMNS).order('name');
-
-    if (response.error) {
-      return { success: false, message: 'Foods konnten nicht geladen werden.' };
-    }
-
-    const rows = (response.data ?? []) as unknown as RawFoodRow[];
-    return { success: true, foods: rows.map(toFood) };
-  }
 
   /**
    * Löst einen gescannten Barcode gezielt an der Datenbank auf — NICHT am

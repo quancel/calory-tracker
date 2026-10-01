@@ -1,7 +1,8 @@
-import { signal } from '@angular/core';
+import { computed, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { EntriesService } from '../core/entries.service';
-import { CoreFoodsService, type Food } from '../core/foods.service';
+import type { LocalFoodsState, ServerFoodHit } from '../core/foods.calculations';
+import { CoreFoodsService, type Food, type ServerSearchResult } from '../core/foods.service';
 import { CoreMealsService, type Meal } from '../core/meals.service';
 import { FoodSearchService } from './food-search.service';
 import { FoodSearchStore } from './food-search.store';
@@ -18,54 +19,51 @@ function makeFood(overrides: Partial<Food> = {}): Food {
     source: 'manual',
     barcode: null,
     isCorrected: false,
+    offPopularity: 0,
     ...overrides,
   };
 }
 
 /**
- * Seit Paket 010 (ADR-0012 Punkt 1) liegt der Katalog-Lesepfad/-Cache in
- * `CoreFoodsService`, nicht mehr in `FoodSearchService`/`FoodSearchStore`
- * selbst. Dieser Fake bildet exakt das bisherige Cache-Verhalten
- * (`ensureLoaded` lädt genau einmal je Sitzung, `retryLoad` erzwingt einen
- * erneuten Versuch, `upsertFood` fügt an/aktualisiert in place) über die
- * `search`-Mock-Funktion ab — die Test-Assertions auf `search` bleiben
- * dadurch inhaltlich unverändert (nur die Quelle der Aufrufe verschiebt
- * sich strukturell von `FoodSearchService` zu `CoreFoodsService`).
+ * Fake von `CoreFoodsService` (ADR-0021): der lokale Bestand wird über die
+ * `search`-Mock-Funktion „geladen" (`ensureLoaded` einmal je Sitzung,
+ * `retryLoad` erneut, `upsertFood` fügt an/aktualisiert in place); die
+ * Serversuche liefert `searchServer`.
  */
 type SearchFn = (
   query: string,
 ) => Promise<{ success: true; foods: Food[] } | { success: false; message: string }>;
 
-function makeCoreFoodsServiceFake(search: SearchFn) {
+type SearchServerFn = (query: string, signal: AbortSignal) => Promise<ServerSearchResult>;
+
+function makeCoreFoodsServiceFake(search: SearchFn, searchServer: SearchServerFn) {
   const foodsState = signal<Food[]>([]);
-  const loadedState = signal(false);
-  const loadingState = signal(false);
-  const loadErrorState = signal<string | null>(null);
+  const localState = signal<LocalFoodsState>('idle');
+  let started = false;
 
   async function load(): Promise<void> {
-    loadingState.set(true);
-    loadErrorState.set(null);
+    localState.set('loading');
 
     const result = await search('');
 
-    loadingState.set(false);
-
     if (!result.success) {
-      loadErrorState.set(result.message);
+      localState.set('unavailable');
       return;
     }
 
     foodsState.set(result.foods);
-    loadedState.set(true);
+    localState.set('ready');
   }
 
   return {
     foods: foodsState.asReadonly(),
-    loading: loadingState.asReadonly(),
-    loadError: loadErrorState.asReadonly(),
-    loaded: loadedState.asReadonly(),
+    ownUseCounts: signal<ReadonlyMap<string, number>>(new Map()).asReadonly(),
+    localState: localState.asReadonly(),
+    initialLoading: computed(() => localState() === 'loading' && foodsState().length === 0),
+    searchServer,
     async ensureLoaded(): Promise<void> {
-      if (loadedState() || loadingState()) return;
+      if (started) return;
+      started = true;
       await load();
     },
     async retryLoad(): Promise<void> {
@@ -85,6 +83,7 @@ function makeCoreFoodsServiceFake(search: SearchFn) {
 
 describe('FoodSearchStore', () => {
   let search: ReturnType<typeof vi.fn>;
+  let searchServer: ReturnType<typeof vi.fn>;
   let createFood: ReturnType<typeof vi.fn>;
   let lookupBarcode: ReturnType<typeof vi.fn>;
   let updateFood: ReturnType<typeof vi.fn>;
@@ -97,7 +96,9 @@ describe('FoodSearchStore', () => {
   let loadMeals: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
+    vi.useFakeTimers();
     search = vi.fn().mockResolvedValue({ success: true, foods: [] });
+    searchServer = vi.fn().mockResolvedValue({ status: 'success', hits: [] });
     createFood = vi.fn().mockResolvedValue({ success: false, message: 'nicht konfiguriert' });
     lookupBarcode = vi.fn().mockResolvedValue({ status: 'not-found' });
     updateFood = vi.fn().mockResolvedValue({ success: false, message: 'nicht konfiguriert' });
@@ -115,7 +116,11 @@ describe('FoodSearchStore', () => {
         { provide: FoodSearchService, useValue: { createFood, lookupBarcode, updateFood } },
         {
           provide: CoreFoodsService,
-          useFactory: () => makeCoreFoodsServiceFake(search as unknown as SearchFn),
+          useFactory: () =>
+            makeCoreFoodsServiceFake(
+              search as unknown as SearchFn,
+              searchServer as unknown as SearchServerFn,
+            ),
         },
         {
           provide: EntriesService,
@@ -133,7 +138,20 @@ describe('FoodSearchStore', () => {
     });
   });
 
-  describe('ensureLoaded (Sitzungs-Cache, ADR-0008 Punkt 3)', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** Lässt den 250-ms-Debounce der Serversuche ablaufen und wartet die Antwort ab. */
+  async function settleServerSearch(): Promise<void> {
+    await vi.advanceTimersByTimeAsync(250);
+  }
+
+  function hit(food: Food): ServerFoodHit {
+    return { food, ownUseCount: 0 };
+  }
+
+  describe('ensureLoaded (lokaler Bestand, ADR-0021 Punkt 6)', () => {
     it('loads the food list on the first call', async () => {
       search.mockResolvedValue({ success: true, foods: [makeFood()] });
       const store = TestBed.inject(FoodSearchStore);
@@ -141,10 +159,10 @@ describe('FoodSearchStore', () => {
       await store.ensureLoaded();
 
       expect(search).toHaveBeenCalledTimes(1);
+      expect(store.loading()).toBe(false);
+      expect(store.searchStatus()).toEqual({ kind: 'none' });
       store.setQuery('Apfel');
       expect(store.results()).toHaveLength(1);
-      expect(store.loading()).toBe(false);
-      expect(store.loadError()).toBeNull();
     });
 
     it('does NOT reload on a second call within the same session', async () => {
@@ -157,27 +175,28 @@ describe('FoodSearchStore', () => {
       expect(search).toHaveBeenCalledTimes(1);
     });
 
-    it('sets a load error and does not mark the session as loaded on failure', async () => {
-      search.mockResolvedValue({ success: false, message: 'Foods konnten nicht geladen werden.' });
+    it('reports an unavailable local stock via the status line and retries from there', async () => {
+      search.mockResolvedValue({ success: false, message: 'x' });
       const store = TestBed.inject(FoodSearchStore);
 
       await store.ensureLoaded();
 
-      expect(store.loadError()).toBe('Foods konnten nicht geladen werden.');
+      // Priorität 1, unabhängig von der Eingabelänge — auch bei leerer Suche.
+      expect(store.searchStatus()).toEqual({ kind: 'local-unavailable' });
+      expect(store.searchStatusReserved()).toBe(true);
 
-      // A failed load does not count as "loaded" — retryLoad tries again.
       search.mockResolvedValue({ success: true, foods: [makeFood()] });
-      await store.retryLoad();
+      await store.retrySearch();
 
       expect(search).toHaveBeenCalledTimes(2);
-      expect(store.loadError()).toBeNull();
+      expect(store.searchStatus()).toEqual({ kind: 'none' });
       store.setQuery('Apfel');
       expect(store.results()).toHaveLength(1);
     });
   });
 
-  describe('results / query (In-Memory-Filterung, kein ilike je Tastendruck)', () => {
-    it('filters the cached list without calling the service again', async () => {
+  describe('results / query (lokal sofort, Server ab 2 Zeichen nach Debounce)', () => {
+    it('filters the local stock without a server call for a single character', async () => {
       search.mockResolvedValue({
         success: true,
         foods: [makeFood({ id: '1', name: 'Apfel' }), makeFood({ id: '2', name: 'Banane' })],
@@ -185,10 +204,60 @@ describe('FoodSearchStore', () => {
       const store = TestBed.inject(FoodSearchStore);
       await store.ensureLoaded();
 
-      store.setQuery('apf');
+      store.setQuery('a');
+      await settleServerSearch();
 
-      expect(store.results().map((f) => f.id)).toEqual(['1']);
+      expect(store.results().map((f) => f.id)).toEqual(['1', '2']);
       expect(search).toHaveBeenCalledTimes(1);
+      expect(searchServer).not.toHaveBeenCalled();
+    });
+
+    it('appends the server hits after the local ones, without duplicates, local rows unchanged', async () => {
+      search.mockResolvedValue({
+        success: true,
+        foods: [makeFood({ id: '1', name: 'Apfelmus' })],
+      });
+      searchServer.mockResolvedValue({
+        status: 'success',
+        hits: [
+          hit(makeFood({ id: '1', name: 'Apfelmus' })),
+          hit(makeFood({ id: 'srv', name: 'Apfelsaft' })),
+        ],
+      });
+      const store = TestBed.inject(FoodSearchStore);
+      await store.ensureLoaded();
+
+      store.setQuery('apf');
+      expect(store.results().map((f) => f.id)).toEqual(['1']);
+      await settleServerSearch();
+
+      expect(searchServer).toHaveBeenCalledTimes(1);
+      expect(store.results().map((f) => f.id)).toEqual(['1', 'srv']);
+      expect(store.localResultCount()).toBe(1);
+    });
+
+    it('shows two skeleton rows while the server search runs and nothing matches locally', async () => {
+      searchServer.mockReturnValue(new Promise(() => undefined));
+      const store = TestBed.inject(FoodSearchStore);
+      await store.ensureLoaded();
+
+      store.setQuery('xyz');
+      await settleServerSearch();
+
+      expect(store.searchStatus()).toEqual({ kind: 'searching' });
+      expect(store.skeletonRows()).toBe(2);
+      expect(store.showEmptyState()).toBe(false);
+    });
+
+    it('adopts a food into the local stock when it is selected (server hits need that for Step C and the offline buffer)', async () => {
+      const store = TestBed.inject(FoodSearchStore);
+      const core = TestBed.inject(CoreFoodsService);
+      await store.ensureLoaded();
+
+      store.selectFood(makeFood({ id: 'srv', name: 'Server-Treffer' }));
+
+      expect(core.foods().some((f) => f.id === 'srv')).toBe(true);
+      expect(store.beginCorrect('srv')).toBe(true);
     });
   });
 
@@ -250,14 +319,38 @@ describe('FoodSearchStore', () => {
       expect(store.showEmptyState()).toBe(false);
     });
 
-    it('is true for a non-empty query with no matches', async () => {
+    it('is true for a non-empty query with no matches, once the server search ended successfully', async () => {
       search.mockResolvedValue({ success: true, foods: [makeFood({ name: 'Apfel' })] });
       const store = TestBed.inject(FoodSearchStore);
       await store.ensureLoaded();
 
       store.setQuery('Kiwi');
+      expect(store.showEmptyState()).toBe(false); // Serversuche läuft noch
+      await settleServerSearch();
 
       expect(store.showEmptyState()).toBe(true);
+      expect(store.emptyState()).toEqual({ kind: 'no-hit', minCharsHint: false });
+    });
+
+    it('says "no local hits" when the server search failed', async () => {
+      searchServer.mockResolvedValue({ status: 'error' });
+      const store = TestBed.inject(FoodSearchStore);
+      await store.ensureLoaded();
+
+      store.setQuery('Kiwi');
+      await settleServerSearch();
+
+      expect(store.searchStatus()).toEqual({ kind: 'server-failed' });
+      expect(store.emptyState()).toEqual({ kind: 'no-local-hit', minCharsHint: false });
+    });
+
+    it('adds the "online search from 2 characters" hint for a single character without a hit', async () => {
+      const store = TestBed.inject(FoodSearchStore);
+      await store.ensureLoaded();
+
+      store.setQuery('k');
+
+      expect(store.emptyState()).toEqual({ kind: 'no-hit', minCharsHint: true });
     });
 
     it('is false once a match exists for the query', async () => {
@@ -403,10 +496,29 @@ describe('FoodSearchStore', () => {
       });
     });
 
-    it('beginCorrect falls back to the active Step-B draft when the food is not yet in the cache (defaultPortionG/barcode unknown)', async () => {
+    it('beginCorrect falls back to the active Step-B draft when the food is not in the local stock (defaultPortionG/barcode unknown)', async () => {
+      loadEntry.mockResolvedValue({
+        success: true,
+        entry: {
+          id: 'e10',
+          date: '2026-09-30',
+          mealType: 'snack',
+          amountG: 100,
+          syncState: 'synced',
+          food: {
+            id: 'f10',
+            name: 'Birne',
+            kcal100g: 57,
+            proteinG100g: 0.4,
+            carbsG100g: 15,
+            fatG100g: 0.1,
+            source: 'manual',
+          },
+        },
+      });
       const store = TestBed.inject(FoodSearchStore);
-      await store.ensureLoaded(); // leerer Cache
-      store.selectFood(makeFood({ id: 'f10', name: 'Birne', defaultPortionG: 200, barcode: '999' }));
+      await store.ensureLoaded(); // leerer Bestand
+      await store.loadEntryForEdit('e10'); // Bearbeiten-Flow: Food nur als Step-B-Entwurf
 
       const opened = store.beginCorrect('f10');
 

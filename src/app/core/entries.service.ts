@@ -275,6 +275,7 @@ export class EntriesService {
 
       if (outcome.kind === 'success') {
         this.bumpRevision();
+        void this.coreFoods.recordUse([input.foodId]);
         return { success: true };
       }
       if (outcome.kind === 'permanent') {
@@ -292,6 +293,7 @@ export class EntriesService {
       console.error('[EntriesService] runQueue fehlgeschlagen (createEntry)', error);
     });
     this.bumpRevision();
+    void this.coreFoods.recordUse([input.foodId]);
     return { success: true };
   }
 
@@ -342,6 +344,7 @@ export class EntriesService {
 
       if (!response.error) {
         this.bumpRevision();
+        void this.coreFoods.recordUse(inputs.map((input) => input.foodId));
         return { success: true, ids: ((response.data ?? []) as { id: string }[]).map((r) => r.id) };
       }
 
@@ -350,6 +353,7 @@ export class EntriesService {
         // 23505 auf den Batch: die IDs sind bereits vorhanden — ein
         // Wiederholungsversuch gilt als Erfolg (Idempotenz, ADR-0016 Punkt 3).
         this.bumpRevision();
+        void this.coreFoods.recordUse(inputs.map((input) => input.foodId));
         return { success: true, ids };
       }
       if (classification === 'permanent') {
@@ -369,6 +373,7 @@ export class EntriesService {
       console.error('[EntriesService] runQueue fehlgeschlagen (createEntries)', error);
     });
     this.bumpRevision();
+    void this.coreFoods.recordUse(inputs.map((input) => input.foodId));
     return { success: true, ids };
   }
 
@@ -472,19 +477,21 @@ export class EntriesService {
 
   /**
    * Puffert einen Anlegevorgang in der Queue. Der Nährwert-Schnappschuss
-   * (ADR-0016 Punkt 6) kommt aus dem Sitzungs-Cache von
-   * `core/foods.service.ts` — das Food ist dort bereits geladen, weil der
-   * Nutzer es in Step A ausgewählt hat (und der Katalog selbst offline über
-   * den Lesecache verfügbar bleibt, ADR-0016 Punkt 8). `false`, wenn das
-   * Food ausnahmsweise nicht im Cache liegt (defensiver Fallback ohne
-   * Snapshot-Grundlage — ohne ihn wäre der Eintrag offline nicht darstellbar).
+   * (ADR-0016 Punkt 6) kommt über `CoreFoodsService.findFood()` aus dem
+   * lokalen Bestand (ADR-0021 Punkt 8): das wartet das Lesen der
+   * gespeicherten Teile ab, statt sich auf den Speicherstand zum
+   * Aufrufzeitpunkt zu verlassen. Ausgewählte Server-Treffer, angelegte,
+   * gescannte und aus gespeicherten Mahlzeiten stammende Foods liegen dort
+   * (Nutzer-Teil). `false`, wenn das Food ausnahmsweise fehlt (defensiver
+   * Fallback ohne Snapshot-Grundlage — ohne ihn wäre der Eintrag offline
+   * nicht darstellbar).
    */
   private async bufferCreate(
     id: string,
     input: CreateEntryInput,
     attemptsUsed: number,
   ): Promise<boolean> {
-    const food = this.coreFoods.foods().find((f) => f.id === input.foodId);
+    const food = await this.coreFoods.findFood(input.foodId);
     if (!food) return false;
 
     await this.entryQueue.enqueue({

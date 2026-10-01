@@ -1,0 +1,46 @@
+<div
+  class="status-line"
+  [class.status-line-reserved]="reserveSpace()"
+  role="status"
+  aria-live="polite"
+>
+  @switch (status().kind) {
+    @case ('local-unavailable') {
+      <span class="status-text">Lokale Treffer nicht verfügbar</span>
+      <button type="button" class="retry-button" (click)="onRetry()">Erneut versuchen</button>
+    }
+    @case ('offline') {
+      <svg class="status-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+        <path
+          d="M3 3l18 18M9.5 5.6A5.5 5.5 0 0 1 16.4 8 4 4 0 0 1 19 15.2M6.5 18h8M6 9.4A4.5 4.5 0 0 0 6.5 18"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.6"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+      <span class="status-text">Offline – nur lokale Treffer</span>
+    }
+    @case ('server-failed') {
+      <svg class="status-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+        <path
+          d="M3 3l18 18M9.5 5.6A5.5 5.5 0 0 1 16.4 8 4 4 0 0 1 19 15.2M6.5 18h8M6 9.4A4.5 4.5 0 0 0 6.5 18"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.6"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+      <span class="status-text">Online-Suche fehlgeschlagen</span>
+      <button type="button" class="retry-button" (click)="onRetry()">Erneut versuchen</button>
+    }
+    @case ('searching') {
+      <span class="status-text status-text-searching">Suche online …</span>
+    }
+  }
+  @if (announcement(); as text) {
+    <span class="sr-only">{{ text }}</span>
+  }
+</div>

@@ -48,3 +48,6 @@ Thumbs.db
 
 # Supabase CLI lokaler Cache
 supabase/.temp/
+
+# Erzeugte OFF-Import-Chargen (ADR-0022 Punkt 7) — lokal vom Nutzer erzeugt, nicht committet
+/supabase/data/

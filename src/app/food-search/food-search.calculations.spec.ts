@@ -1,7 +1,9 @@
 import {
+  barcodeLookupKeys,
   cameraErrorMessage,
   foodToCorrectFormValues,
   isOffProductComplete,
+  normalizeBarcode,
   normalizeMealType,
   normalizeOffProduct,
   nutritionDraftFromFormValues,
@@ -24,6 +26,7 @@ function makeFood(overrides: Partial<Food> = {}): Food {
     source: 'manual',
     barcode: null,
     isCorrected: false,
+    offPopularity: 0,
     ...overrides,
   };
 }
@@ -327,5 +330,92 @@ describe('foodToCorrectFormValues (Step-C-Vorbelegung, ADR-0011 Punkt 6)', () =>
 
     expect(result.defaultPortionG).toBe('');
     expect(result.barcode).toBe('');
+  });
+});
+
+describe('normalizeBarcode', () => {
+  it('pads a 12-digit UPC-A to the 13-digit EAN form', () => {
+    expect(normalizeBarcode('012345678905')).toBe('0012345678905');
+  });
+
+  it('keeps a 13-digit EAN as is', () => {
+    expect(normalizeBarcode('4006381333931')).toBe('4006381333931');
+  });
+
+  it('reduces a 14-digit GTIN with leading zero to the 13-digit form', () => {
+    expect(normalizeBarcode('04006381333931')).toBe('4006381333931');
+  });
+
+  it('keeps a real 14-digit GTIN unchanged', () => {
+    expect(normalizeBarcode('14006381333938')).toBe('14006381333938');
+  });
+
+  it('strips leading zeros down to an 8-digit EAN-8', () => {
+    expect(normalizeBarcode('0000012345678')).toBe('12345678');
+  });
+
+  it('pads short codes to 8 digits', () => {
+    expect(normalizeBarcode('1234567')).toBe('01234567');
+    expect(normalizeBarcode('42')).toBe('00000042');
+  });
+
+  it('trims surrounding whitespace', () => {
+    expect(normalizeBarcode('  4006381333931 ')).toBe('4006381333931');
+  });
+
+  it('returns null for non-digit input', () => {
+    expect(normalizeBarcode('ABC-1')).toBeNull();
+    expect(normalizeBarcode('4006 381')).toBeNull();
+    expect(normalizeBarcode('12.5')).toBeNull();
+  });
+
+  it('returns null for empty or all-zero input', () => {
+    expect(normalizeBarcode('')).toBeNull();
+    expect(normalizeBarcode('   ')).toBeNull();
+    expect(normalizeBarcode('0000')).toBeNull();
+  });
+
+  it('gives one form for the same GTIN in 8/12/13/14 digits', () => {
+    const forms = ['00012345', '000000012345', '0000000012345', '00000000012345'].map(
+      normalizeBarcode,
+    );
+    expect(new Set(forms).size).toBe(1);
+  });
+
+  it('is idempotent', () => {
+    for (const raw of ['012345678905', '04006381333931', '0000012345678', '42']) {
+      const once = normalizeBarcode(raw);
+      expect(normalizeBarcode(once as string)).toBe(once);
+    }
+  });
+});
+
+describe('barcodeLookupKeys', () => {
+  it('lists canonical, UPC-A and raw form for a 12-digit scan', () => {
+    expect(barcodeLookupKeys('012345678905')).toEqual(['0012345678905', '012345678905']);
+  });
+
+  it('adds the 12-digit key for a 13-digit form with leading zero', () => {
+    expect(barcodeLookupKeys('0012345678905')).toEqual(['0012345678905', '012345678905']);
+  });
+
+  it('lists canonical and raw for a 14-digit code with leading zero', () => {
+    expect(barcodeLookupKeys('04006381333931')).toEqual(['4006381333931', '04006381333931']);
+  });
+
+  it('returns a single key when raw equals the canonical form', () => {
+    expect(barcodeLookupKeys('4006381333931')).toEqual(['4006381333931']);
+  });
+
+  it('returns only the trimmed raw value for non-numeric input', () => {
+    expect(barcodeLookupKeys(' ABC-1 ')).toEqual(['ABC-1']);
+  });
+
+  it('returns an empty list for empty input', () => {
+    expect(barcodeLookupKeys('  ')).toEqual([]);
+  });
+
+  it('collapses zero-padded raw values of an EAN-8 to canonical plus raw', () => {
+    expect(barcodeLookupKeys('0000012345678')).toEqual(['12345678', '0000012345678']);
   });
 });

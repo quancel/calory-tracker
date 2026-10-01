@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "types": ["node"],
+    "rootDirs": ["../../src", "./stubs"]
+  },
+  "files": [],
+  "include": ["*.ts"],
+  "references": []
+}

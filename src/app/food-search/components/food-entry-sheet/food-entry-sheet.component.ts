@@ -29,6 +29,7 @@ import type { Food } from '../../../core/foods.service';
 import { BottomSheetComponent } from '../../../shared/ui/bottom-sheet/bottom-sheet.component';
 import { ConfirmDialogComponent } from '../../../shared/ui/confirm-dialog/confirm-dialog.component';
 import { PlausibilityMarkerComponent } from '../../../shared/ui/plausibility-marker/plausibility-marker.component';
+import { SearchStatusLineComponent } from '../../../shared/ui/search-status-line/search-status-line.component';
 import { BarcodeScannerComponent } from '../barcode-scanner/barcode-scanner.component';
 
 type SheetStep = 'search' | 'create' | 'amount' | 'scan' | 'scan-success' | 'correct';
@@ -69,6 +70,7 @@ type ValidatableCreateFoodField = Exclude<keyof CreateFoodFormValues, 'barcode'>
     BottomSheetComponent,
     ConfirmDialogComponent,
     PlausibilityMarkerComponent,
+    SearchStatusLineComponent,
     BarcodeScannerComponent,
   ],
   templateUrl: './food-entry-sheet.component.html',
@@ -81,6 +83,11 @@ export class FoodEntrySheetComponent implements OnInit, AfterViewInit {
 
   protected readonly mealTypeOptions = MEAL_TYPE_ORDER;
   protected readonly mealTypeLabels = MEAL_TYPE_LABELS;
+
+  /** 2 oder 3 Skeleton-Zeilen (erstes Laden bzw. laufende Serversuche). */
+  protected skeletonRowList(): number[] {
+    return Array.from({ length: this.store.skeletonRows() }, (_, index) => index);
+  }
 
   private readonly date = this.route.snapshot.queryParamMap.get('date') ?? '';
   private readonly entryId = this.route.snapshot.queryParamMap.get('entryId');
@@ -240,8 +247,14 @@ export class FoodEntrySheetComponent implements OnInit, AfterViewInit {
 
   /** Marker-Slot in der Suchtrefferliste wird bei markiertem Food selbst zum Tap-Ziel und öffnet Step C für GENAU dieses Food (nicht das gerade in Step B aktive). */
   protected openCorrectFromList(food: Food): void {
+    // Ein Server-Treffer liegt erst nach der Übernahme im lokalen Bestand (ADR-0021 Punkt 8).
+    this.store.adoptFood(food);
+    this.startCorrect(food.id);
+  }
+
+  private startCorrect(foodId: string): void {
     this.correctReturnStep = this.step();
-    if (!this.store.beginCorrect(food.id)) return;
+    if (!this.store.beginCorrect(foodId)) return;
     this.step.set('correct');
     this.correctTouchedFields.set({
       name: false,
@@ -258,7 +271,8 @@ export class FoodEntrySheetComponent implements OnInit, AfterViewInit {
   protected openCorrectFromStepB(): void {
     const food = this.store.stepBFood();
     if (!food) return;
-    this.openCorrectFromList({ ...food, defaultPortionG: null, barcode: null, isCorrected: false });
+    // Kein `adoptFood()`: `StepBFood` trägt nicht alle Felder, das vollständige Food liegt bereits im Bestand.
+    this.startCorrect(food.id);
   }
 
   protected backFromCorrect(): void {

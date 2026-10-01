@@ -1,0 +1,68 @@
+:host {
+  display: block;
+}
+
+.status-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+/* Reserviert ca. 24px, solange die Zeile erscheinen kann — die Liste springt nicht. */
+.status-line-reserved {
+  min-height: var(--space-6);
+}
+
+.status-icon {
+  flex: none;
+}
+
+/* Systemzustand, kein Fehler: ausschließlich --color-text-muted (design-conventions.md). */
+.status-text-searching {
+  animation: status-fade-in var(--duration-fast) var(--ease-out) 300ms both;
+}
+
+.retry-button {
+  min-height: var(--size-touch-target-min);
+  padding: 0 var(--space-3);
+  border: none;
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.retry-button:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+@keyframes status-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Ohne Einblend-Animation, aber mit der 300ms-Verzögerung: schnelle Antworten sollen nichts aufblitzen lassen. */
+  .status-text-searching {
+    animation-duration: 1ms;
+  }
+}

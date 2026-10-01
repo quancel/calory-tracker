@@ -69,22 +69,37 @@
         </button>
       </div>
 
-      @if (store.loading()) {
+      <app-search-status-line
+        [status]="store.searchStatus()"
+        [announcement]="store.searchAnnouncement()"
+        [reserveSpace]="store.searchStatusReserved()"
+        (retry)="store.retrySearch()"
+      />
+
+      @if (store.skeletonRows() > 0) {
         <div class="state-loading" aria-busy="true" aria-live="polite">
-          <div class="skeleton-row"></div>
-          <div class="skeleton-row"></div>
-          <div class="skeleton-row"></div>
+          @for (row of skeletonRowList(); track row) {
+            <div class="skeleton-row"></div>
+          }
         </div>
-      } @else if (store.loadError(); as message) {
-        <div class="state-error" role="alert">
-          <p class="error-text">{{ message }}</p>
-          <button type="button" class="retry-button" (click)="store.retryLoad()">
-            Erneut versuchen
-          </button>
-        </div>
-      } @else if (store.showEmptyState()) {
+      } @else if (store.emptyState(); as empty) {
         <div class="empty-state">
-          <p class="empty-text">Kein Treffer für „{{ store.query().trim() }}"</p>
+          <p class="empty-text">
+            @switch (empty.kind) {
+              @case ('no-local-hit') {
+                Keine lokalen Treffer für „{{ store.query().trim() }}"
+              }
+              @case ('no-online-hit') {
+                Keine Treffer online für „{{ store.query().trim() }}"
+              }
+              @default {
+                Kein Treffer für „{{ store.query().trim() }}"
+              }
+            }
+          </p>
+          @if (empty.minCharsHint) {
+            <p class="empty-hint">Online-Suche ab 2 Zeichen.</p>
+          }
           <button type="button" class="primary-button" (click)="goToCreate()">
             „{{ store.query().trim() }}" anlegen
           </button>
@@ -97,7 +112,7 @@
         }
         <ul class="result-list">
           @for (food of store.results(); track food.id) {
-            <li class="result-item">
+            <li class="result-item" [class.result-item-appended]="$index >= store.localResultCount() && !store.isShowingRecent()">
               <span class="marker-slot">
                 <app-plausibility-marker
                   [marker]="marker(food)"

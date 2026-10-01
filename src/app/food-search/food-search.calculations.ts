@@ -21,21 +21,6 @@ import type { CreateFoodInput } from './models/food.model';
 
 export type { TextFieldValidation };
 
-/**
- * Bildet eine Liste von `food_id`s (jüngste zuerst) auf die passenden
- * `Food`-Objekte aus dem Sitzungs-Cache ab — Reihenfolge bleibt erhalten,
- * bereits gelöschte/unbekannte IDs werden übersprungen statt einen Fehler
- * auszulösen. Grundlage der „Zuletzt verwendet"-Liste in Step A.
- */
-export function selectRecentFoods(foods: readonly Food[], recentFoodIds: readonly string[]): Food[] {
-  const byId = new Map(foods.map((food) => [food.id, food]));
-  const result: Food[] = [];
-  for (const id of recentFoodIds) {
-    const food = byId.get(id);
-    if (food !== undefined) result.push(food);
-  }
-  return result;
-}
 export type NumberFieldValidation =
   { valid: true; value: number } | { valid: false; error: string };
 export type OptionalPositiveValidation =
@@ -265,4 +250,40 @@ export function cameraErrorMessage(reason: CameraErrorReason): string {
     case 'unsupported':
       return 'Barcode-Scan wird auf diesem Gerät nicht unterstützt.';
   }
+}
+
+/**
+ * Kanonische Barcode-Form (ADR-0022 Punkt 4) — EINE Funktion für den
+ * OFF-Import und den Scan: trimmen; nur Ziffern, sonst `null`; führende
+ * Nullen entfernen; leer → `null`; Länge ≤ 8 → links mit `0` auf 8; Länge
+ * 9–13 → auf 13; ab 14 unverändert. Dieselbe GTIN in 8/12/13/14 Stellen
+ * ergibt dieselbe Form (GS1-Lesart). Reine Funktion, ohne Angular-/Node-Import
+ * (wird auch vom Import-Skript unter `scripts/off-import/` geladen).
+ */
+export function normalizeBarcode(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!/^[0-9]+$/.test(trimmed)) return null;
+  const digits = trimmed.replace(/^0+/, '');
+  if (digits === '') return null;
+  if (digits.length <= 8) return digits.padStart(8, '0');
+  if (digits.length <= 13) return digits.padStart(13, '0');
+  return digits;
+}
+
+/**
+ * Lookup-Schlüssel für einen Barcode (ADR-0022 Punkt 4): eindeutige, geordnete
+ * Liste aus kanonischer Form, bei 13-stelliger Form mit führender `0`
+ * zusätzlich der 12-stelligen UPC-A-Form, und dem getrimmten Rohwert (findet
+ * damit auch vor dieser Regel gespeicherte Rohwerte). Leerer Rohwert → `[]`.
+ */
+export function barcodeLookupKeys(raw: string): string[] {
+  const trimmed = raw.trim();
+  const keys: string[] = [];
+  const canonical = normalizeBarcode(trimmed);
+  if (canonical !== null) {
+    keys.push(canonical);
+    if (canonical.length === 13 && canonical.startsWith('0')) keys.push(canonical.slice(1));
+  }
+  if (trimmed !== '') keys.push(trimmed);
+  return [...new Set(keys)];
 }

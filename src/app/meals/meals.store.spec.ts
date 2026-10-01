@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
-import { CoreFoodsService, type Food } from '../core/foods.service';
+import { EntriesService } from '../core/entries.service';
+import { CoreFoodsService, type Food, type ServerSearchResult } from '../core/foods.service';
 import { CoreMealsService, type Meal } from '../core/meals.service';
 import { MealsService } from './meals.service';
 import { MealsStore } from './meals.store';
@@ -16,6 +17,7 @@ function makeFood(overrides: Partial<Food> = {}): Food {
     source: 'manual',
     barcode: null,
     isCorrected: false,
+    offPopularity: 0,
     ...overrides,
   };
 }
@@ -41,8 +43,15 @@ describe('MealsStore', () => {
   let updateMeal: ReturnType<typeof vi.fn>;
   let deleteMealFn: ReturnType<typeof vi.fn>;
   let foods: Food[];
+  let loadRecentFoodIds: ReturnType<typeof vi.fn>;
+  let searchServer: ReturnType<typeof vi.fn>;
+  let upsertFood: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
+    vi.useFakeTimers();
+    loadRecentFoodIds = vi.fn().mockResolvedValue([]);
+    searchServer = vi.fn<() => Promise<ServerSearchResult>>().mockResolvedValue({ status: 'success', hits: [] });
+    upsertFood = vi.fn();
     loadMeals = vi.fn().mockResolvedValue({ success: true, meals: [] });
     createMeal = vi.fn().mockResolvedValue({ success: true, mealId: 'new-1' });
     updateMeal = vi.fn().mockResolvedValue({ success: true });
@@ -57,15 +66,23 @@ describe('MealsStore', () => {
           provide: CoreFoodsService,
           useValue: {
             foods: () => foods,
-            loading: () => false,
-            loadError: () => null,
-            ensureLoaded: vi.fn(),
-            retryLoad: vi.fn(),
+            ownUseCounts: () => new Map<string, number>(),
+            localState: () => 'ready',
+            initialLoading: () => false,
+            ensureLoaded: vi.fn().mockResolvedValue(undefined),
+            retryLoad: vi.fn().mockResolvedValue(undefined),
+            searchServer,
+            upsertFood,
           },
         },
+        { provide: EntriesService, useValue: { loadRecentFoodIds } },
         { provide: MealsService, useValue: { createMeal, updateMeal, deleteMeal: deleteMealFn } },
       ],
     });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe('ensureListLoaded / meals (Sortierung + Summen, ADR-0012 Punkt 3/4)', () => {
@@ -161,14 +178,77 @@ describe('MealsStore', () => {
     });
   });
 
-  describe('M2 (nur Auswahl bestehender Foods, Nutzerentscheidung 2026-09-21)', () => {
-    it('filters the core food cache case-insensitively', () => {
+  describe('M2 (nur Auswahl bestehender Foods, Nutzerentscheidung 2026-09-21; Hybrid-Suche ADR-0021)', () => {
+    it('filters the local stock case-insensitively', () => {
       foods = [makeFood({ id: '1', name: 'Apfel' }), makeFood({ id: '2', name: 'Banane' })];
       const store = TestBed.inject(MealsStore);
 
       store.setM2Query('BAN');
 
       expect(store.m2Results().map((f) => f.id)).toEqual(['2']);
+    });
+
+    it('shows "Zuletzt verwendet" — not the whole local stock — for an empty query (Nutzerentscheidung 2026-09-30)', async () => {
+      foods = [
+        makeFood({ id: '1', name: 'Apfel' }),
+        makeFood({ id: '2', name: 'Banane' }),
+        makeFood({ id: '3', name: 'Curry' }),
+      ];
+      loadRecentFoodIds.mockResolvedValue(['3', '1']);
+      const store = TestBed.inject(MealsStore);
+
+      await store.ensureFoodsLoaded();
+
+      expect(loadRecentFoodIds).toHaveBeenCalledWith(10);
+      expect(store.m2ShowingRecent()).toBe(true);
+      expect(store.m2Results().map((f) => f.id)).toEqual(['3', '1']);
+    });
+
+    it('shows the no-recent hint instead of the whole stock when nothing was logged yet', async () => {
+      foods = [makeFood({ id: '1' })];
+      const store = TestBed.inject(MealsStore);
+
+      await store.ensureFoodsLoaded();
+
+      expect(store.m2Results()).toEqual([]);
+      expect(store.m2ShowNoRecent()).toBe(true);
+    });
+
+    it('appends server hits after the local ones from 2 characters on, after the debounce', async () => {
+      foods = [makeFood({ id: '1', name: 'Apfelmus' })];
+      searchServer.mockResolvedValue({
+        status: 'success',
+        hits: [{ food: makeFood({ id: 'srv', name: 'Apfelsaft' }), ownUseCount: 0 }],
+      });
+      const store = TestBed.inject(MealsStore);
+
+      store.setM2Query('apf');
+      expect(searchServer).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(250);
+
+      expect(store.m2Results().map((f) => f.id)).toEqual(['1', 'srv']);
+      expect(store.m2LocalResultCount()).toBe(1);
+    });
+
+    it('shows the empty line only after the server search ended without a hit', async () => {
+      const store = TestBed.inject(MealsStore);
+
+      store.setM2Query('kiwi');
+      expect(store.m2EmptyState()).toBeNull();
+      expect(store.m2SkeletonRows()).toBe(2);
+      await vi.advanceTimersByTimeAsync(250);
+
+      expect(store.m2EmptyState()).toEqual({ kind: 'no-hit', minCharsHint: false });
+      expect(store.m2SkeletonRows()).toBe(0);
+    });
+
+    it('beginAddItem clears the M2 query', () => {
+      const store = TestBed.inject(MealsStore);
+      store.setM2Query('abc');
+
+      store.beginAddItem();
+
+      expect(store.m2Query()).toBe('');
     });
   });
 
@@ -179,6 +259,15 @@ describe('MealsStore', () => {
 
       expect(store.isChangeMode()).toBe(false);
       expect(store.m3Food()).toBeNull();
+    });
+
+    it('selectM2Food adopts the food (also a server hit) into the local stock', () => {
+      const store = TestBed.inject(MealsStore);
+      const food = makeFood({ id: 'srv' });
+
+      store.selectM2Food(food);
+
+      expect(upsertFood).toHaveBeenCalledWith(food);
     });
 
     it('selectM2Food (add mode) prefills amount from defaultPortionG', () => {

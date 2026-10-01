@@ -267,30 +267,11 @@
   background: var(--color-surface-sunken);
 }
 
-.state-error {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-3);
-  text-align: center;
-  padding: var(--space-6) 0;
-}
-
-.error-text,
 .empty-text {
   margin: 0;
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
   text-align: center;
-}
-
-.retry-button {
-  min-height: var(--size-touch-target-min);
-  border: none;
-  background: none;
-  color: var(--color-text);
-  font-size: var(--font-size-sm);
-  cursor: pointer;
 }
 
 .amount-input-wrap {
@@ -356,8 +337,40 @@
 .item-row-body:focus-visible,
 .remove-button:focus-visible,
 .result-row:focus-visible,
-.retry-button:focus-visible,
 .search-input:focus-visible {
   outline: var(--focus-ring-width) solid var(--color-focus-ring);
   outline-offset: var(--focus-ring-offset);
+}
+
+.list-heading {
+  margin: var(--space-2) 0 0;
+  padding: 0 var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+/* „Online-Suche ab 2 Zeichen." unter dem Leerzustand-Text. */
+.empty-hint {
+  margin-top: var(--space-1);
+  font-size: var(--font-size-xs);
+}
+
+/* Server-Treffer werden nur angehängt: neue Zeilen blenden per Fade ein, kein Slide (design-conventions.md „Hybrid-Suche"). */
+.result-item-appended {
+  animation: result-fade-in var(--duration-fast) var(--ease-out) both;
+}
+
+@keyframes result-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .result-item-appended {
+    animation: none;
+  }
 }

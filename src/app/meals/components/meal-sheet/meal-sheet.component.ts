@@ -15,6 +15,7 @@ import type { Food } from '../../../core/foods.service';
 import { BottomSheetComponent } from '../../../shared/ui/bottom-sheet/bottom-sheet.component';
 import { ConfirmDialogComponent } from '../../../shared/ui/confirm-dialog/confirm-dialog.component';
 import { PlausibilityMarkerComponent } from '../../../shared/ui/plausibility-marker/plausibility-marker.component';
+import { SearchStatusLineComponent } from '../../../shared/ui/search-status-line/search-status-line.component';
 import { MealsStore } from '../../meals.store';
 
 type MealSheetStep = 'm1' | 'm2' | 'm3';
@@ -37,7 +38,13 @@ type MealSheetStep = 'm1' | 'm2' | 'm3';
 @Component({
   selector: 'app-meal-sheet',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DecimalPipe, BottomSheetComponent, ConfirmDialogComponent, PlausibilityMarkerComponent],
+  imports: [
+    DecimalPipe,
+    BottomSheetComponent,
+    ConfirmDialogComponent,
+    PlausibilityMarkerComponent,
+    SearchStatusLineComponent,
+  ],
   templateUrl: './meal-sheet.component.html',
   styleUrl: './meal-sheet.component.css',
 })
@@ -51,6 +58,11 @@ export class MealSheetComponent implements OnInit, AfterViewInit {
   protected readonly step = signal<MealSheetStep>('m1');
   protected readonly confirmDeleteOpen = signal(false);
   protected readonly nameTouched = signal(false);
+
+  /** 2 Skeleton-Zeilen in M2 (erstes Laden bzw. laufende Serversuche). */
+  protected m2SkeletonRowList(): number[] {
+    return Array.from({ length: this.store.m2SkeletonRows() }, (_, index) => index);
+  }
 
   @ViewChild('nameInput') private readonly nameInputRef?: ElementRef<HTMLInputElement>;
   @ViewChild('m2SearchInput') private readonly m2SearchInputRef?: ElementRef<HTMLInputElement>;

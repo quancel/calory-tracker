@@ -3,98 +3,6 @@ import { SupabaseService } from '../core/supabase.service';
 import { FoodSearchOffService } from './food-search.off.service';
 import { FoodSearchService } from './food-search.service';
 
-const FOOD_COLUMNS =
-  'id, name, kcal_100g, protein_100g, carbs_100g, fat_100g, default_portion_g, source, barcode, is_corrected';
-
-function makeSelectQuery(response: { data: unknown; error: unknown }) {
-  return {
-    select: vi.fn().mockReturnValue({
-      order: vi.fn().mockResolvedValue(response),
-    }),
-  };
-}
-
-describe('FoodSearchService.search', () => {
-  let response: { data: unknown; error: unknown };
-  let from: ReturnType<typeof vi.fn>;
-
-  beforeEach(() => {
-    response = { data: [], error: null };
-    from = vi.fn().mockImplementation((table: string) => {
-      if (table === 'foods') return makeSelectQuery(response);
-      throw new Error(`unexpected table ${table}`);
-    });
-
-    TestBed.resetTestingModule();
-    TestBed.configureTestingModule({
-      providers: [{ provide: SupabaseService, useValue: { client: { from } } }],
-    });
-  });
-
-  it('maps snake_case rows to the domain model, including a null default portion and barcode', async () => {
-    response.data = [
-      {
-        id: 'f1',
-        name: 'Apfel',
-        kcal_100g: 52,
-        protein_100g: 0.3,
-        carbs_100g: 14,
-        fat_100g: 0.2,
-        default_portion_g: null,
-        source: 'manual',
-        barcode: null,
-        is_corrected: false,
-      },
-    ];
-
-    const service = TestBed.inject(FoodSearchService);
-    const result = await service.search('');
-
-    expect(result).toEqual({
-      success: true,
-      foods: [
-        {
-          id: 'f1',
-          name: 'Apfel',
-          kcal100g: 52,
-          proteinG100g: 0.3,
-          carbsG100g: 14,
-          fatG100g: 0.2,
-          defaultPortionG: null,
-          source: 'manual',
-          barcode: null,
-          isCorrected: false,
-        },
-      ],
-    });
-  });
-
-  it('does not filter server-side — query is not sent as an ilike condition', async () => {
-    const service = TestBed.inject(FoodSearchService);
-    await service.search('apfel');
-
-    const selectQuery = from.mock.results[0].value;
-    expect(selectQuery.select).toHaveBeenCalledWith(FOOD_COLUMNS);
-  });
-
-  it('returns an empty list when there are no rows yet', async () => {
-    const service = TestBed.inject(FoodSearchService);
-    const result = await service.search('');
-
-    expect(result).toEqual({ success: true, foods: [] });
-  });
-
-  it('returns a generic error message when the query fails', async () => {
-    response = { data: null, error: { message: 'network down' } };
-    from.mockImplementation(() => makeSelectQuery(response));
-
-    const service = TestBed.inject(FoodSearchService);
-    const result = await service.search('');
-
-    expect(result).toEqual({ success: false, message: 'Foods konnten nicht geladen werden.' });
-  });
-});
-
 describe('FoodSearchService.createFood', () => {
   let insertResponse: { data: unknown; error: unknown };
   let insert: ReturnType<typeof vi.fn>;
@@ -167,6 +75,7 @@ describe('FoodSearchService.createFood', () => {
         defaultPortionG: null,
         source: 'manual',
         barcode: null,
+        offPopularity: 0,
       },
     });
   });
@@ -341,6 +250,7 @@ describe('FoodSearchService.updateFood (Step C, ADR-0011 Punkt 6)', () => {
         source: 'manual',
         barcode: null,
         isCorrected: true,
+        offPopularity: 0,
       },
     });
   });

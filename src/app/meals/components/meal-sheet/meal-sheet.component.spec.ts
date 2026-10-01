@@ -17,6 +17,7 @@ function makeFood(overrides: Partial<Food> = {}): Food {
     source: 'manual',
     barcode: null,
     isCorrected: false,
+    offPopularity: 0,
     ...overrides,
   };
 }
@@ -34,8 +35,14 @@ describe('MealSheetComponent', () => {
     canSaveMeal: ReturnType<typeof signal>;
     m2Query: ReturnType<typeof signal>;
     m2Results: ReturnType<typeof signal>;
-    foodsLoading: ReturnType<typeof signal>;
-    foodsLoadError: ReturnType<typeof signal>;
+    m2ShowingRecent: ReturnType<typeof signal>;
+    m2LocalResultCount: ReturnType<typeof signal>;
+    m2SearchStatus: ReturnType<typeof signal>;
+    m2SearchStatusReserved: ReturnType<typeof signal>;
+    m2SearchAnnouncement: ReturnType<typeof signal>;
+    m2EmptyState: ReturnType<typeof signal>;
+    m2ShowNoRecent: ReturnType<typeof signal>;
+    m2SkeletonRows: ReturnType<typeof signal>;
     m3Food: ReturnType<typeof signal>;
     m3AmountInput: ReturnType<typeof signal>;
     m3AmountValidation: ReturnType<typeof signal>;
@@ -43,7 +50,7 @@ describe('MealSheetComponent', () => {
     isChangeMode: ReturnType<typeof signal>;
     ensureListLoaded: ReturnType<typeof vi.fn>;
     ensureFoodsLoaded: ReturnType<typeof vi.fn>;
-    retryFoodsLoad: ReturnType<typeof vi.fn>;
+    retryM2Search: ReturnType<typeof vi.fn>;
     beginNewMeal: ReturnType<typeof vi.fn>;
     beginEditMeal: ReturnType<typeof vi.fn>;
     setDraftName: ReturnType<typeof vi.fn>;
@@ -71,8 +78,14 @@ describe('MealSheetComponent', () => {
       canSaveMeal: signal(false),
       m2Query: signal(''),
       m2Results: signal<Food[]>([]),
-      foodsLoading: signal(false),
-      foodsLoadError: signal<string | null>(null),
+      m2ShowingRecent: signal(false),
+      m2LocalResultCount: signal(0),
+      m2SearchStatus: signal<{ kind: string }>({ kind: 'none' }),
+      m2SearchStatusReserved: signal(false),
+      m2SearchAnnouncement: signal<string | null>(null),
+      m2EmptyState: signal<{ kind: string; minCharsHint: boolean } | null>(null),
+      m2ShowNoRecent: signal(false),
+      m2SkeletonRows: signal(0),
       m3Food: signal<Food | null>(null),
       m3AmountInput: signal(''),
       m3AmountValidation: signal({ valid: false, error: 'Bitte eine Menge eingeben.' }),
@@ -80,7 +93,7 @@ describe('MealSheetComponent', () => {
       isChangeMode: signal(false),
       ensureListLoaded: vi.fn().mockResolvedValue(undefined),
       ensureFoodsLoaded: vi.fn().mockResolvedValue(undefined),
-      retryFoodsLoad: vi.fn(),
+      retryM2Search: vi.fn(),
       beginNewMeal: vi.fn(),
       beginEditMeal: vi.fn().mockReturnValue(true),
       setDraftName: vi.fn(),
@@ -233,6 +246,55 @@ describe('MealSheetComponent', () => {
       fixture.detectChanges();
 
       expect(fixture.nativeElement.querySelector('.marker-slot button')).toBeNull();
+    });
+
+    it('shows the status line and no error block when the local stock is unavailable; retry goes to the store', () => {
+      storeStub.m2SearchStatus.set({ kind: 'local-unavailable' });
+      storeStub.m2SearchStatusReserved.set(true);
+      storeStub.m2Results.set([makeFood()]);
+      const fixture = TestBed.createComponent(MealSheetComponent);
+      (fixture.componentInstance as unknown as { step: { set: (v: string) => void } }).step.set(
+        'm2',
+      );
+      fixture.detectChanges();
+
+      const line = fixture.nativeElement.querySelector('app-search-status-line [role="status"]');
+      expect(line.textContent).toContain('Lokale Treffer nicht verfügbar');
+      expect(fixture.nativeElement.querySelector('.state-error')).toBeNull();
+      // Die Liste bleibt trotzdem bedienbar.
+      expect(fixture.nativeElement.querySelector('.result-row')).toBeTruthy();
+
+      fixture.nativeElement.querySelector('app-search-status-line button').click();
+      expect(storeStub.retryM2Search).toHaveBeenCalledTimes(1);
+    });
+
+    it('renders the empty line without a create button once the server search ended without a hit', () => {
+      storeStub.m2Query.set('kiwi');
+      storeStub.m2EmptyState.set({ kind: 'no-hit', minCharsHint: false });
+      const fixture = TestBed.createComponent(MealSheetComponent);
+      (fixture.componentInstance as unknown as { step: { set: (v: string) => void } }).step.set(
+        'm2',
+      );
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.empty-text').textContent).toContain(
+        'Kein Treffer für „kiwi"',
+      );
+      expect(fixture.nativeElement.querySelector('.primary-button')).toBeNull();
+    });
+
+    it('shows "Zuletzt verwendet" as the list heading for an empty query', () => {
+      storeStub.m2ShowingRecent.set(true);
+      storeStub.m2Results.set([makeFood()]);
+      const fixture = TestBed.createComponent(MealSheetComponent);
+      (fixture.componentInstance as unknown as { step: { set: (v: string) => void } }).step.set(
+        'm2',
+      );
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.list-heading').textContent).toContain(
+        'Zuletzt verwendet',
+      );
     });
 
     it('tap on a result row selects the food and opens M3', () => {

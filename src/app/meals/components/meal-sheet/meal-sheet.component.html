@@ -123,24 +123,48 @@
       (input)="onM2QueryInput($event)"
     />
 
-    @if (store.foodsLoading()) {
+    <app-search-status-line
+      [status]="store.m2SearchStatus()"
+      [announcement]="store.m2SearchAnnouncement()"
+      [reserveSpace]="store.m2SearchStatusReserved()"
+      (retry)="store.retryM2Search()"
+    />
+
+    @if (store.m2SkeletonRows() > 0) {
       <div class="state-loading" aria-busy="true" aria-live="polite">
-        <div class="skeleton-row"></div>
-        <div class="skeleton-row"></div>
+        @for (row of m2SkeletonRowList(); track row) {
+          <div class="skeleton-row"></div>
+        }
       </div>
-    } @else if (store.foodsLoadError(); as message) {
-      <div class="state-error" role="alert">
-        <p class="error-text">{{ message }}</p>
-        <button type="button" class="retry-button" (click)="store.retryFoodsLoad()">
-          Erneut versuchen
-        </button>
-      </div>
-    } @else if (store.m2Results().length === 0) {
-      <p class="empty-text">Kein Treffer für „{{ store.m2Query().trim() }}"</p>
+    } @else if (store.m2EmptyState(); as empty) {
+      <p class="empty-text">
+        @switch (empty.kind) {
+          @case ('no-local-hit') {
+            Keine lokalen Treffer für „{{ store.m2Query().trim() }}"
+          }
+          @case ('no-online-hit') {
+            Keine Treffer online für „{{ store.m2Query().trim() }}"
+          }
+          @default {
+            Kein Treffer für „{{ store.m2Query().trim() }}"
+          }
+        }
+      </p>
+      @if (empty.minCharsHint) {
+        <p class="empty-text empty-hint">Online-Suche ab 2 Zeichen.</p>
+      }
+    } @else if (store.m2ShowNoRecent()) {
+      <p class="list-heading">Suche nach einem Lebensmittel</p>
     } @else {
+      @if (store.m2ShowingRecent()) {
+        <p class="list-heading">Zuletzt verwendet</p>
+      }
       <ul class="result-list">
         @for (food of store.m2Results(); track food.id) {
-          <li class="result-item">
+          <li
+            class="result-item"
+            [class.result-item-appended]="$index >= store.m2LocalResultCount() && !store.m2ShowingRecent()"
+          >
             <span class="marker-slot">
               <app-plausibility-marker [marker]="m3Marker(food)" />
             </span>
